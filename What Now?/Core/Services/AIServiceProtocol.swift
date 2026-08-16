@@ -15,15 +15,16 @@ enum AIAssistantIntent {
     case createTask(title: String, durationMinutes: Int?, deadline: Date?)
     case startFocus(taskTitleFragment: String)
     case getRecommendations
+    case askQuestion(prompt: String, options: [String], expectedField: String)
 }
 
-struct ProposedBlock: Decodable {
+struct ProposedBlock: Codable, Equatable {
     let title: String
     let startTimeIso: String // e.g. "2023-10-31T18:00:00Z"
     let durationMinutes: Int
 }
 
-struct PlanModification: Decodable {
+struct PlanModification: Codable, Equatable {
     let originalTitleFragment: String
     let newStartTimeIso: String?
     let newDurationMinutes: Int?

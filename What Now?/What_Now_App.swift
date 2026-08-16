@@ -27,6 +27,9 @@ struct What_Now_App: App {
             WNUserProfile.self,
             WNAIConversation.self,
             WNAIMessage.self,
+            WNChatSession.self,
+            WNChatMessage.self,
+            WNMemory.self
         ])
 
         let config = ModelConfiguration(

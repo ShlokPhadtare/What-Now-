@@ -346,33 +346,49 @@ struct MemorySettingsView: View {
     
     var body: some View {
         List {
-            if let memories = appState?.memoryService.allMemories(), !memories.isEmpty {
-                Section {
-                    ForEach(memories) { memory in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(memory.content)
-                                .font(.body)
-                            Text(memory.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .onDelete { indexSet in
-                        for index in indexSet {
-                            if let memory = appState?.memoryService.allMemories()[index] {
-                                appState?.memoryService.deleteMemory(memory)
+            if let appState = appState {
+                let groupedMemories = appState.memoryService.memoriesByCategory()
+                
+                if groupedMemories.isEmpty {
+                    ContentUnavailableView("No Memories", systemImage: "brain", description: Text("What Now? will remember your preferences as you chat with the Assistant."))
+                } else {
+                    ForEach(WNMemoryCategory.allCases, id: \.self) { category in
+                        if let memories = groupedMemories[category], !memories.isEmpty {
+                            Section(category.rawValue) {
+                                ForEach(memories) { memory in
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(memory.content)
+                                                .font(.body)
+                                            Text(memory.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Toggle("", isOn: Binding(
+                                            get: { memory.isEnabled },
+                                            set: { _ in appState.memoryService.toggleMemory(memory) }
+                                        ))
+                                        .labelsHidden()
+                                    }
+                                }
+                                .onDelete { indexSet in
+                                    for index in indexSet {
+                                        appState.memoryService.deleteMemory(memories[index])
+                                    }
+                                }
                             }
                         }
                     }
-                }
-                
-                Section {
-                    Button("Clear All Memories", role: .destructive) {
-                        appState?.memoryService.clearAll()
+                    
+                    Section {
+                        Button("Clear All Memories", role: .destructive) {
+                            appState.memoryService.clearAll()
+                        }
                     }
                 }
-            } else {
-                ContentUnavailableView("No Memories", systemImage: "brain", description: Text("What Now? will remember your preferences as you chat with the Assistant."))
             }
         }
         .navigationTitle("Memory")

@@ -13,54 +13,87 @@ struct AssistantView: View {
     @State private var query: String = ""
     @State private var isProcessing: Bool = false
     @FocusState private var isFocused: Bool
+    
+    @State private var showHistory: Bool = false
+    @State private var voiceInput = VoiceInputService()
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
-            
-            if let appState = appState, appState.chatHistory.isEmpty {
-                emptyState
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: WNTheme.Spacing.lg) {
-                            ForEach(appState?.chatHistory ?? []) { message in
-                                chatBubble(for: message)
-                                    .id(message.id)
+        NavigationStack {
+            ZStack(alignment: .bottom) {
+                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+                
+                if appState?.activeChatSession?.messages.isEmpty ?? true {
+                    emptyState
+                } else {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: WNTheme.Spacing.lg) {
+                                ForEach(appState?.activeChatSession?.messages.sorted(by: { $0.timestamp < $1.timestamp }) ?? []) { message in
+                                    chatBubble(for: message.chatMessage)
+                                        .id(message.id)
+                                }
+                                if isProcessing {
+                                    progressBubble
+                                        .id("progress")
+                                }
                             }
-                            if isProcessing {
-                                progressBubble
-                                    .id("progress")
+                            .padding(.horizontal, WNTheme.Spacing.lg)
+                            .padding(.top, WNTheme.Spacing.md)
+                            .padding(.bottom, 120) // space for floating composer
+                        }
+                        .onChange(of: appState?.activeChatSession?.messages.count ?? 0) { _, _ in
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                if let last = appState?.activeChatSession?.messages.max(by: { $0.timestamp < $1.timestamp }) {
+                                    proxy.scrollTo(last.id, anchor: .bottom)
+                                }
                             }
                         }
-                        .padding(.horizontal, WNTheme.Spacing.lg)
-                        .padding(.top, WNTheme.Spacing.md)
-                        .padding(.bottom, 120) // space for floating composer
+                        .onChange(of: isProcessing) { _, isProc in
+                            if isProc {
+                                withAnimation { proxy.scrollTo("progress", anchor: .bottom) }
+                            }
+                        }
                     }
-                    .onChange(of: appState?.chatHistory.count ?? 0) { _, _ in
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            if let last = appState?.chatHistory.last {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: isProcessing) { _, isProc in
-                        if isProc {
-                            withAnimation { proxy.scrollTo("progress", anchor: .bottom) }
-                        }
+                    .scrollDismissesKeyboard(.interactively)
+                    .onTapGesture {
+                        isFocused = false
                     }
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .onTapGesture {
-                    isFocused = false
+                
+                inputArea
+                    .padding(.bottom, 16)
+            }
+            .navigationTitle(appState?.activeChatSession?.title ?? "What Now?")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showHistory = true
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
                 }
             }
-            
-            inputArea
-                .padding(.bottom, 16)
-        }
-        .onAppear {
-            isFocused = true
+            .onAppear {
+                isFocused = true
+                voiceInput.requestPermissions()
+                
+                // Auto-create a session if none exists
+                if appState?.activeChatSession == nil, let context = appState?.modelContext {
+                    let session = WNChatSession(title: "New Chat")
+                    context.insert(session)
+                    try? context.save()
+                    appState?.activeChatSession = session
+                }
+            }
+            .onChange(of: voiceInput.recognizedText) { _, text in
+                if voiceInput.isRecording && !text.isEmpty {
+                    query = text
+                }
+            }
+            .sheet(isPresented: $showHistory) {
+                AssistantHistoryView()
+            }
         }
     }
     
@@ -176,6 +209,8 @@ struct AssistantView: View {
                     planModificationBubble(actions: actions)
                 case .memorySaved(let fact):
                     memoryBubble(fact: fact)
+                case .question(let prompt, let options, _):
+                    questionBubble(prompt: prompt, options: options)
                 }
                 Spacer(minLength: 40)
             }
@@ -307,6 +342,38 @@ struct AssistantView: View {
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color(uiColor: .separator).opacity(0.5), lineWidth: 0.5))
     }
     
+    @ViewBuilder
+    private func questionBubble(prompt: String, options: [String]) -> some View {
+        VStack(alignment: .leading, spacing: WNTheme.Spacing.sm) {
+            Text(LocalizedStringKey(prompt))
+                .font(.body)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+            
+            if !options.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(options, id: \.self) { option in
+                            Button {
+                                query = option
+                                submitQuery()
+                            } label: {
+                                Text(option)
+                                    .font(.subheadline.weight(.medium))
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 16)
+                                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+        }
+    }
+    
     private func formatIsoTime(_ iso: String) -> String {
         let formatter = ISO8601DateFormatter()
         guard let date = formatter.date(from: iso) else { return "--:--" }
@@ -336,19 +403,53 @@ struct AssistantView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             
-            Button(action: submitQuery) {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.white)
-                    .frame(width: 32, height: 32)
-                    .background(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(uiColor: .tertiarySystemFill) : Color.accentColor)
-                    .clipShape(Circle())
-                    .scaleEffect(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 1.0 : 1.05)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: query.isEmpty)
+            if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !voiceInput.isRecording {
+                Button(action: {
+                    if voiceInput.isAuthorized {
+                        isFocused = false
+                        voiceInput.toggleRecording()
+                    } else {
+                        voiceInput.requestPermissions()
+                    }
+                }) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(Color(uiColor: .tertiarySystemFill))
+                        .clipShape(Circle())
+                }
+                .padding(.trailing, 8)
+                .padding(.bottom, 6)
+            } else if voiceInput.isRecording {
+                Button(action: {
+                    voiceInput.stopRecording()
+                }) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .frame(width: 32, height: 32)
+                        .background(Color.red)
+                        .clipShape(Circle())
+                        .symbolEffect(.pulse, options: .repeating, isActive: true)
+                }
+                .padding(.trailing, 8)
+                .padding(.bottom, 6)
+            } else {
+                Button(action: submitQuery) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .frame(width: 32, height: 32)
+                        .background(Color.accentColor)
+                        .clipShape(Circle())
+                        .scaleEffect(1.05)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: query.isEmpty)
+                }
+                .disabled(isProcessing)
+                .padding(.trailing, 8)
+                .padding(.bottom, 6)
             }
-            .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isProcessing)
-            .padding(.trailing, 8)
-            .padding(.bottom, 6)
         }
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5))
@@ -358,19 +459,45 @@ struct AssistantView: View {
     
     // MARK: - Actions
     
+    private func appendMessage(_ message: ChatMessage) {
+        guard let session = appState?.activeChatSession else { return }
+        
+        let wnMessage = WNChatMessage(isUser: message.isUser, content: message.content)
+        wnMessage.timestamp = message.timestamp
+        wnMessage.session = session
+        session.messages.append(wnMessage)
+        session.updatedAt = .now
+        
+        // Auto-generate title for first user message
+        if message.isUser && session.messages.filter({ $0.isUser }).count == 1 {
+            if case .text(let t) = message.content {
+                session.title = String(t.prefix(30)) + (t.count > 30 ? "..." : "")
+            }
+        }
+        
+        try? appState?.modelContext.save()
+    }
+    
     private func submitQuery() {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let appState = appState else { return }
         
+        isFocused = false
+        if voiceInput.isRecording {
+            voiceInput.stopRecording()
+        }
+        
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         
         withAnimation {
-            appState.chatHistory.append(ChatMessage(isUser: true, content: .text(text)))
+            appendMessage(ChatMessage(isUser: true, content: .text(text)))
             query = ""
             isProcessing = true
         }
         
-        let history = appState.chatHistory.dropLast().suffix(10).map { AIChatMessage(role: $0.isUser ? "user" : "assistant", content: $0.text) }
+        guard let session = appState.activeChatSession else { return }
+        
+        let history = session.messages.dropLast().suffix(10).map { AIChatMessage(role: $0.isUser ? "user" : "assistant", content: $0.chatMessage.text) }
         
         Task {
             do {
@@ -386,21 +513,10 @@ struct AssistantView: View {
                 let intent = try await appState.aiService.processQuery(text, history: history, context: context)
                 await handleIntent(intent)
             } catch {
-                let lower = text.lowercased()
-                if lower.contains("replan") || lower.contains("plan my day") {
-                    await handleIntent(.planDay)
-                } else if lower.contains("what's next") || lower.contains("recommend") || lower.contains("what should i do") {
-                    await handleIntent(.getRecommendations)
-                } else {
-                    let result = NaturalLanguageTaskParser.parse(text)
-                    if !result.title.isEmpty && (result.estimatedMinutes != nil || result.deadline != nil || lower.contains("task")) {
-                        await handleIntent(.createTask(title: result.title, durationMinutes: result.estimatedMinutes, deadline: result.deadline))
-                    } else {
-                        withAnimation {
-                            appState.chatHistory.append(ChatMessage(isUser: false, content: .text("I'm currently offline and couldn't process that. Try asking me to 'plan my day', 'what's next', or 'add a task'.")))
-                            isProcessing = false
-                        }
-                    }
+                print("Total routing failure: \(error)")
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text("I'm currently offline and couldn't process that.")))
+                    isProcessing = false
                 }
             }
         }
@@ -415,33 +531,33 @@ struct AssistantView: View {
         switch intent {
         case .chatResponse(let message):
             withAnimation {
-                appState?.chatHistory.append(ChatMessage(isUser: false, content: .text(message)))
+                appendMessage(ChatMessage(isUser: false, content: .text(message)))
             }
             
         case .planDay:
             appState?.planService.replanRemainingDay(for: .now)
             appState?.streakService.recordPlanCreated()
             withAnimation {
-                appState?.chatHistory.append(ChatMessage(isUser: false, content: .text("I've planned your day. You can view the timeline in the Plan tab.")))
+                appendMessage(ChatMessage(isUser: false, content: .text("I've planned your day. You can view the timeline in the Plan tab.")))
             }
             
         case .proposePlan(let blocks):
             appState?.planService.applyProposedPlan(blocks)
             appState?.streakService.recordPlanCreated()
             withAnimation {
-                appState?.chatHistory.append(ChatMessage(isUser: false, content: .planProposal(blocks: blocks)))
+                appendMessage(ChatMessage(isUser: false, content: .planProposal(blocks: blocks)))
             }
             
         case .modifyPlan(let actions):
             appState?.planService.applyModifications(actions)
             withAnimation {
-                appState?.chatHistory.append(ChatMessage(isUser: false, content: .planModification(actions: actions)))
+                appendMessage(ChatMessage(isUser: false, content: .planModification(actions: actions)))
             }
             
         case .remember(let fact):
             appState?.memoryService.addMemory(content: fact)
             withAnimation {
-                appState?.chatHistory.append(ChatMessage(isUser: false, content: .memorySaved(fact: fact)))
+                appendMessage(ChatMessage(isUser: false, content: .memorySaved(fact: fact)))
             }
             
         case .createTask(let title, let duration, let deadline):
@@ -456,7 +572,7 @@ struct AssistantView: View {
                 notes: nil
             )
             withAnimation {
-                appState?.chatHistory.append(ChatMessage(isUser: false, content: .actionResult(title: title, duration: duration, deadline: deadline)))
+                appendMessage(ChatMessage(isUser: false, content: .actionResult(title: title, duration: duration, deadline: deadline)))
             }
             
         case .startFocus(let taskTitleFragment):
@@ -466,15 +582,20 @@ struct AssistantView: View {
                 appState?.selectedTab = .focus
             } else {
                 withAnimation {
-                    appState?.chatHistory.append(ChatMessage(isUser: false, content: .text("I couldn't find a task matching '\(taskTitleFragment)'.")))
+                    appendMessage(ChatMessage(isUser: false, content: .text("I couldn't find a task matching '\(taskTitleFragment)'.")))
                 }
             }
             
         case .getRecommendations:
             withAnimation {
-                appState?.chatHistory.append(ChatMessage(isUser: false, content: .text("Check your Home screen for my latest recommendation.")))
+                appendMessage(ChatMessage(isUser: false, content: .text("Check your Home screen for my latest recommendation.")))
             }
             appState?.selectedTab = .home
+            
+        case .askQuestion(let prompt, let options, let expectedField):
+            withAnimation {
+                appendMessage(ChatMessage(isUser: false, content: .question(prompt: prompt, options: options, expectedField: expectedField)))
+            }
         }
     }
 }

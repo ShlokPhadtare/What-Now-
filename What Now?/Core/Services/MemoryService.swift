@@ -18,14 +18,30 @@ final class MemoryService: NSObject {
         super.init()
     }
     
-    func allMemories() -> [WNMemory] {
+    func allMemories(enabledOnly: Bool = false) -> [WNMemory] {
         let descriptor = FetchDescriptor<WNMemory>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
-        return (try? context.fetch(descriptor)) ?? []
+        let all = (try? context.fetch(descriptor)) ?? []
+        if enabledOnly {
+            return all.filter { $0.isEnabled }
+        }
+        return all
     }
     
-    func addMemory(content: String) {
-        let memory = WNMemory(content: content)
+    func memoriesByCategory() -> [WNMemoryCategory: [WNMemory]] {
+        let all = allMemories()
+        return Dictionary(grouping: all, by: { $0.category })
+    }
+    
+    func addMemory(content: String, category: WNMemoryCategory = .other, source: String = "User Conversation") {
+        let memory = WNMemory(content: content, category: category)
+        memory.source = source
         context.insert(memory)
+        save()
+    }
+    
+    func toggleMemory(_ memory: WNMemory) {
+        memory.isEnabled.toggle()
+        memory.updatedAt = .now
         save()
     }
     

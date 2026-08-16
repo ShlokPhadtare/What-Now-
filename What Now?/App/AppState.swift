@@ -26,16 +26,10 @@ final class AppState {
     let streakService: StreakService
     
     // AI Services
-    private let openAIService: OpenAIAssistantService
-    private let lmStudioService: LMStudioAssistantService
+    let intelligenceRouter: IntelligenceRouter
     
     var aiService: AIServiceProtocol {
-        switch preferenceService.aiProvider {
-        case .openAI:
-            return openAIService
-        case .lmStudio:
-            return lmStudioService
-        }
+        return intelligenceRouter
     }
 
     // MARK: - App-Level State
@@ -46,8 +40,8 @@ final class AppState {
     /// The currently active focus session, if any.
     var activeFocusSession: WNFocusSession?
     
-    /// Persistent chat history for the AI assistant across tabs.
-    var chatHistory: [ChatMessage] = []
+    /// The current active chat session.
+    var activeChatSession: WNChatSession?
 
     /// Whether the task editor sheet is presented.
     var isTaskEditorPresented: Bool = false
@@ -70,8 +64,13 @@ final class AppState {
         self.preferenceService = prefService
         self.planService = PlanService(context: modelContext, taskService: taskService, preferenceService: prefService)
         
-        self.openAIService = OpenAIAssistantService(preferenceService: prefService)
-        self.lmStudioService = LMStudioAssistantService(preferenceService: prefService)
+        self.intelligenceRouter = IntelligenceRouter(
+            preferenceService: prefService,
+            taskService: self.taskService,
+            focusService: self.focusService,
+            planService: self.planService,
+            memoryService: self.memoryService
+        )
         
         self.activeFocusSession = focusService.activeSession
 

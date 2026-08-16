@@ -18,8 +18,10 @@ Automatically generate a realistic daily timeline from your pending tasks and re
 
 ### 🤖 AI Assistant & Offline Intelligence
 A natural language chat assistant that understands your tasks and manages your day.
-- **Offline Fallback**: Even without an internet connection, the assistant understands basic commands like "Replan my day", "What's next", or "Add study for 30m".
-- **Dynamic Context**: The AI is aware of your timeline, recent completions, and top priorities without needing to ask.
+- **Three-Tier Intelligence**: The app intelligently routes your requests. It uses powerful Cloud AI (OpenAI/LM Studio) when available, and seamlessly falls back to a deterministic offline engine when you have no connection.
+- **Conversational Task Creation**: Add tasks naturally (e.g., "Add Python"). The assistant will prompt you for missing details ("When?", "How long?") using a state machine.
+- **Option Scrollers**: Instead of typing out answers, use the beautiful, horizontally scrolling Liquid Glass option capsules (e.g., `[Today]`, `[Tomorrow]`) to instantly advance the conversation.
+- **Persistent AI History**: All your conversations are saved securely on-device using SwiftData. Access your past chats via the History menu, complete with auto-generated session titles.
 - **Floating Composer**: A beautiful, native "Liquid Glass" floating composer that stays out of the way while you type.
 
 ### 🧠 Persistent AI Memory

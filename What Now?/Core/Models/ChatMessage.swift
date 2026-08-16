@@ -5,18 +5,20 @@
 
 import Foundation
 
-enum MessageContent {
+enum MessageContent: Codable, Equatable {
     case text(String)
     case actionResult(title: String, duration: Int?, deadline: Date?)
     case planProposal(blocks: [ProposedBlock])
     case planModification(actions: [PlanModification])
     case memorySaved(fact: String)
+    case question(prompt: String, options: [String], expectedField: String)
 }
 
-struct ChatMessage: Identifiable {
-    let id = UUID()
+struct ChatMessage: Identifiable, Codable, Equatable {
+    var id = UUID()
     let isUser: Bool
     let content: MessageContent
+    var timestamp = Date()
     
     var text: String {
         switch content {
@@ -25,6 +27,7 @@ struct ChatMessage: Identifiable {
         case .planProposal: return "Proposed a plan."
         case .planModification: return "Modified the plan."
         case .memorySaved: return "Remembered a fact."
+        case .question(let prompt, _, _): return prompt
         }
     }
 }

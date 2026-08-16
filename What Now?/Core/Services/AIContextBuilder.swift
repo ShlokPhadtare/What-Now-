@@ -60,7 +60,7 @@ struct AIContextBuilder {
         let prefs = preferenceService.profile
         var prefString = "USER ONBOARDING PREFERENCES:\nPeak Energy: \(prefs.peakEnergyTimeEnum.displayName)\nPreferred Focus Duration: \(prefs.preferredFocusMinutes)m"
         
-        let memories = memoryService.allMemories()
+        let memories = memoryService.allMemories(enabledOnly: true)
         if !memories.isEmpty {
             let memString = memories.map { "- \($0.content)" }.joined(separator: "\n")
             prefString += "\n\nLEARNED USER MEMORIES (LONG-TERM):\n\(memString)"
