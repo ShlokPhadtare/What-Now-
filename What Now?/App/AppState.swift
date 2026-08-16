@@ -45,9 +45,9 @@ final class AppState {
 
     /// The currently active focus session, if any.
     var activeFocusSession: WNFocusSession?
-
-    /// Whether the assistant sheet is presented.
-    var isAssistantPresented: Bool = false
+    
+    /// Persistent chat history for the AI assistant across tabs.
+    var chatHistory: [ChatMessage] = []
 
     /// Whether the task editor sheet is presented.
     var isTaskEditorPresented: Bool = false

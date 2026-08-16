@@ -58,7 +58,7 @@ struct HomeView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    appState?.isAssistantPresented = true
+                    appState?.selectedTab = .assistant
                 } label: {
                     Image(systemName: "sparkles")
                 }
@@ -111,7 +111,7 @@ struct HomeView: View {
 
             VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
                 Button {
-                    appState?.isAssistantPresented = true
+                    appState?.selectedTab = .assistant
                 } label: {
                     HStack {
                         Text("Plan tomorrow")

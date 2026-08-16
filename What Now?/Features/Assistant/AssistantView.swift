@@ -11,45 +11,20 @@ struct AssistantView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var query: String = ""
-    @State private var chatHistory: [ChatMessage] = []
     @State private var isProcessing: Bool = false
     @FocusState private var isFocused: Bool
 
-    enum MessageContent {
-        case text(String)
-        case actionResult(title: String, duration: Int?, deadline: Date?)
-        case planProposal(blocks: [ProposedBlock])
-        case planModification(actions: [PlanModification])
-        case memorySaved(fact: String)
-    }
-    
-    struct ChatMessage: Identifiable {
-        let id = UUID()
-        let isUser: Bool
-        let content: MessageContent
-        
-        var text: String {
-            switch content {
-            case .text(let t): return t
-            case .actionResult(let title, _, _): return "Created task: \(title)"
-            case .planProposal: return "Proposed a plan."
-            case .planModification: return "Modified the plan."
-            case .memorySaved: return "Remembered a fact."
-            }
-        }
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        ZStack(alignment: .bottom) {
+            Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
             
-            if chatHistory.isEmpty {
+            if let appState = appState, appState.chatHistory.isEmpty {
                 emptyState
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: WNTheme.Spacing.lg) {
-                            ForEach(chatHistory) { message in
+                            ForEach(appState?.chatHistory ?? []) { message in
                                 chatBubble(for: message)
                                     .id(message.id)
                             }
@@ -59,11 +34,12 @@ struct AssistantView: View {
                             }
                         }
                         .padding(.horizontal, WNTheme.Spacing.lg)
-                        .padding(.vertical, WNTheme.Spacing.md)
+                        .padding(.top, WNTheme.Spacing.md)
+                        .padding(.bottom, 120) // space for floating composer
                     }
-                    .onChange(of: chatHistory.count) { _, _ in
+                    .onChange(of: appState?.chatHistory.count ?? 0) { _, _ in
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            if let last = chatHistory.last {
+                            if let last = appState?.chatHistory.last {
                                 proxy.scrollTo(last.id, anchor: .bottom)
                             }
                         }
@@ -74,11 +50,15 @@ struct AssistantView: View {
                         }
                     }
                 }
+                .scrollDismissesKeyboard(.interactively)
+                .onTapGesture {
+                    isFocused = false
+                }
             }
             
             inputArea
+                .padding(.bottom, 16)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
         .onAppear {
             isFocused = true
         }
@@ -86,39 +66,23 @@ struct AssistantView: View {
     
     // MARK: - Components
     
-    private var header: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "sparkles")
-                .foregroundStyle(Color.accentColor)
-                .rotationEffect(Angle(degrees: isProcessing ? 180 : 0))
-                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: false), value: isProcessing)
-            
-            Text("Assistant")
-                .font(.headline)
-                .foregroundStyle(.primary)
-        }
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity)
-        .background(.regularMaterial)
-    }
+    // Header removed per design requirements
     
     @ViewBuilder
     private var emptyState: some View {
         ScrollView {
-            VStack(spacing: WNTheme.Spacing.xl) {
-                Spacer().frame(height: 40)
-                
-                VStack(spacing: WNTheme.Spacing.md) {
+            VStack(spacing: WNTheme.Spacing.lg) {
+                VStack(spacing: WNTheme.Spacing.sm) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 40, weight: .light))
+                        .font(.system(size: 32, weight: .light))
                         .foregroundStyle(Color.accentColor)
                     
                     Text("Ask What Now?")
-                        .font(.system(size: 32, weight: .semibold))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(.primary)
                     
                     Text("Plan your day, manage tasks, or figure out what to do next.")
-                        .font(.body)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, WNTheme.Spacing.xl)
@@ -130,10 +94,14 @@ struct AssistantView: View {
                         suggestionButton(suggestion)
                     }
                 }
-                .padding(.top, WNTheme.Spacing.lg)
-                
-                Spacer()
+                .padding(.top, WNTheme.Spacing.sm)
             }
+            .padding(.vertical, WNTheme.Spacing.xl)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .onTapGesture {
+            isFocused = false
         }
     }
     
@@ -173,13 +141,11 @@ struct AssistantView: View {
         } label: {
             Text(text)
                 .font(.subheadline.weight(.medium))
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
                 .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .padding(.horizontal, 40)
+        .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
+        .foregroundStyle(.primary)
     }
     
     @ViewBuilder
@@ -187,7 +153,7 @@ struct AssistantView: View {
         HStack {
             if message.isUser {
                 Spacer(minLength: 40)
-                Text(message.text)
+                Text(LocalizedStringKey(message.text))
                     .font(.body)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
@@ -196,7 +162,7 @@ struct AssistantView: View {
             } else {
                 switch message.content {
                 case .text(let text):
-                    Text(text)
+                    Text(LocalizedStringKey(text))
                         .font(.body)
                         .foregroundStyle(.primary)
                         .padding(.horizontal, 8)
@@ -250,7 +216,7 @@ struct AssistantView: View {
                     let pending = appState.taskService.pendingTasks()
                     if let match = pending.first(where: { $0.title == title }) {
                         appState.startFocus(for: match)
-                        dismiss()
+                        appState.selectedTab = .focus
                     }
                 }
             } label: {
@@ -352,46 +318,42 @@ struct AssistantView: View {
     private var progressBubble: some View {
         HStack {
             Image(systemName: "sparkles")
-                .font(.title3)
+                .font(.body)
                 .foregroundStyle(Color.accentColor)
-                .scaleEffect(isProcessing ? 1.1 : 0.9)
-                .opacity(isProcessing ? 0.4 : 1.0)
-                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isProcessing)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .symbolEffect(.pulse, options: .repeating, isActive: isProcessing)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             Spacer()
         }
         .transition(.opacity)
     }
     
     private var inputArea: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(alignment: .bottom, spacing: 8) {
-                TextField("Ask What Now...", text: $query, axis: .vertical)
-                    .lineLimit(1...5)
-                    .focused($isFocused)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                
-                Button(action: submitQuery) {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.white)
-                        .frame(width: 32, height: 32)
-                        .background(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(uiColor: .tertiarySystemFill) : Color.accentColor)
-                        .clipShape(Circle())
-                        .animation(.easeInOut(duration: 0.2), value: query)
-                }
-                .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isProcessing)
-                .padding(.trailing, 8)
-                .padding(.bottom, 6)
+        HStack(alignment: .bottom, spacing: 8) {
+            TextField("Ask What Now...", text: $query, axis: .vertical)
+                .lineLimit(1...5)
+                .focused($isFocused)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            
+            Button(action: submitQuery) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.white)
+                    .frame(width: 32, height: 32)
+                    .background(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(uiColor: .tertiarySystemFill) : Color.accentColor)
+                    .clipShape(Circle())
+                    .scaleEffect(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 1.0 : 1.05)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: query.isEmpty)
             }
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isProcessing)
+            .padding(.trailing, 8)
+            .padding(.bottom, 6)
         }
-        .background(.ultraThinMaterial)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5))
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .padding(.horizontal, 16)
     }
     
     // MARK: - Actions
@@ -403,12 +365,12 @@ struct AssistantView: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         
         withAnimation {
-            chatHistory.append(ChatMessage(isUser: true, content: .text(text)))
+            appState.chatHistory.append(ChatMessage(isUser: true, content: .text(text)))
             query = ""
             isProcessing = true
         }
         
-        let history = chatHistory.dropLast().suffix(10).map { AIChatMessage(role: $0.isUser ? "user" : "assistant", content: $0.text) }
+        let history = appState.chatHistory.dropLast().suffix(10).map { AIChatMessage(role: $0.isUser ? "user" : "assistant", content: $0.text) }
         
         Task {
             do {
@@ -424,9 +386,21 @@ struct AssistantView: View {
                 let intent = try await appState.aiService.processQuery(text, history: history, context: context)
                 await handleIntent(intent)
             } catch {
-                withAnimation {
-                    chatHistory.append(ChatMessage(isUser: false, content: .text("I'm sorry, I couldn't process that right now.")))
-                    isProcessing = false
+                let lower = text.lowercased()
+                if lower.contains("replan") || lower.contains("plan my day") {
+                    await handleIntent(.planDay)
+                } else if lower.contains("what's next") || lower.contains("recommend") || lower.contains("what should i do") {
+                    await handleIntent(.getRecommendations)
+                } else {
+                    let result = NaturalLanguageTaskParser.parse(text)
+                    if !result.title.isEmpty && (result.estimatedMinutes != nil || result.deadline != nil || lower.contains("task")) {
+                        await handleIntent(.createTask(title: result.title, durationMinutes: result.estimatedMinutes, deadline: result.deadline))
+                    } else {
+                        withAnimation {
+                            appState.chatHistory.append(ChatMessage(isUser: false, content: .text("I'm currently offline and couldn't process that. Try asking me to 'plan my day', 'what's next', or 'add a task'.")))
+                            isProcessing = false
+                        }
+                    }
                 }
             }
         }
@@ -441,33 +415,33 @@ struct AssistantView: View {
         switch intent {
         case .chatResponse(let message):
             withAnimation {
-                chatHistory.append(ChatMessage(isUser: false, content: .text(message)))
+                appState?.chatHistory.append(ChatMessage(isUser: false, content: .text(message)))
             }
             
         case .planDay:
-            withAnimation {
-                chatHistory.append(ChatMessage(isUser: false, content: .text("I've planned your day. You can view the timeline in the Plan tab.")))
-            }
-            appState?.planService.generatePlan(for: .now)
+            appState?.planService.replanRemainingDay(for: .now)
             appState?.streakService.recordPlanCreated()
+            withAnimation {
+                appState?.chatHistory.append(ChatMessage(isUser: false, content: .text("I've planned your day. You can view the timeline in the Plan tab.")))
+            }
             
         case .proposePlan(let blocks):
             appState?.planService.applyProposedPlan(blocks)
             appState?.streakService.recordPlanCreated()
             withAnimation {
-                chatHistory.append(ChatMessage(isUser: false, content: .planProposal(blocks: blocks)))
+                appState?.chatHistory.append(ChatMessage(isUser: false, content: .planProposal(blocks: blocks)))
             }
             
         case .modifyPlan(let actions):
             appState?.planService.applyModifications(actions)
             withAnimation {
-                chatHistory.append(ChatMessage(isUser: false, content: .planModification(actions: actions)))
+                appState?.chatHistory.append(ChatMessage(isUser: false, content: .planModification(actions: actions)))
             }
             
         case .remember(let fact):
             appState?.memoryService.addMemory(content: fact)
             withAnimation {
-                chatHistory.append(ChatMessage(isUser: false, content: .memorySaved(fact: fact)))
+                appState?.chatHistory.append(ChatMessage(isUser: false, content: .memorySaved(fact: fact)))
             }
             
         case .createTask(let title, let duration, let deadline):
@@ -482,25 +456,25 @@ struct AssistantView: View {
                 notes: nil
             )
             withAnimation {
-                chatHistory.append(ChatMessage(isUser: false, content: .actionResult(title: title, duration: duration, deadline: deadline)))
+                appState?.chatHistory.append(ChatMessage(isUser: false, content: .actionResult(title: title, duration: duration, deadline: deadline)))
             }
             
         case .startFocus(let taskTitleFragment):
             let pending = appState?.taskService.pendingTasks() ?? []
             if let match = pending.first(where: { $0.title.lowercased().contains(taskTitleFragment.lowercased()) }) {
                 appState?.startFocus(for: match)
-                dismiss()
+                appState?.selectedTab = .focus
             } else {
                 withAnimation {
-                    chatHistory.append(ChatMessage(isUser: false, content: .text("I couldn't find a task matching '\(taskTitleFragment)'.")))
+                    appState?.chatHistory.append(ChatMessage(isUser: false, content: .text("I couldn't find a task matching '\(taskTitleFragment)'.")))
                 }
             }
             
         case .getRecommendations:
             withAnimation {
-                chatHistory.append(ChatMessage(isUser: false, content: .text("Check your Home screen for my latest recommendation.")))
+                appState?.chatHistory.append(ChatMessage(isUser: false, content: .text("Check your Home screen for my latest recommendation.")))
             }
-            dismiss()
+            appState?.selectedTab = .home
         }
     }
 }

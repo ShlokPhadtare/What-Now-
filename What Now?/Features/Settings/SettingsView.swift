@@ -49,6 +49,9 @@ struct SettingsView: View {
                 NavigationLink("AI Configuration") {
                     AIConfigurationView()
                 }
+                NavigationLink("Memory") {
+                    MemorySettingsView()
+                }
             }
 
             // MARK: - Integrations (Phase 4)
@@ -333,5 +336,45 @@ struct AIConfigurationView: View {
                 await MainActor.run { self.isLoadingModels = false }
             }
         }
+    }
+}
+
+// MARK: - Memory Settings
+
+struct MemorySettingsView: View {
+    @Environment(\.appState) private var appState
+    
+    var body: some View {
+        List {
+            if let memories = appState?.memoryService.allMemories(), !memories.isEmpty {
+                Section {
+                    ForEach(memories) { memory in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(memory.content)
+                                .font(.body)
+                            Text(memory.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onDelete { indexSet in
+                        for index in indexSet {
+                            if let memory = appState?.memoryService.allMemories()[index] {
+                                appState?.memoryService.deleteMemory(memory)
+                            }
+                        }
+                    }
+                }
+                
+                Section {
+                    Button("Clear All Memories", role: .destructive) {
+                        appState?.memoryService.clearAll()
+                    }
+                }
+            } else {
+                ContentUnavailableView("No Memories", systemImage: "brain", description: Text("What Now? will remember your preferences as you chat with the Assistant."))
+            }
+        }
+        .navigationTitle("Memory")
     }
 }

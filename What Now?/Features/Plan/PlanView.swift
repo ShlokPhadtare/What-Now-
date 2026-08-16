@@ -31,8 +31,17 @@ struct PlanView: View {
                     Spacer()
 
                     if dailyPlan != nil {
-                        Button("Replan", action: generatePlan)
-                            .font(.subheadline)
+                        Button {
+                            Task { await replan() }
+                        } label: {
+                            if isReplanning {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text("Replan")
+                            }
+                        }
+                        .font(.subheadline)
+                        .disabled(isReplanning)
                     }
                 }
                 .padding(.vertical, WNTheme.Spacing.xs)
@@ -76,6 +85,8 @@ struct PlanView: View {
         .onChange(of: selectedDate) { _, _ in refreshPlan() }
     }
 
+    @State private var isReplanning: Bool = false
+
     private func refreshPlan() {
         dailyPlan = appState?.planService.plan(for: selectedDate)
     }
@@ -83,6 +94,16 @@ struct PlanView: View {
     private func generatePlan() {
         withAnimation {
             dailyPlan = appState?.planService.generatePlan(for: selectedDate)
+        }
+    }
+    
+    private func replan() async {
+        guard let appState else { return }
+        isReplanning = true
+        try? await Task.sleep(nanoseconds: 300_000_000) // subtle transition
+        withAnimation {
+            dailyPlan = appState.planService.replanRemainingDay(for: selectedDate)
+            isReplanning = false
         }
     }
 
@@ -97,31 +118,87 @@ struct PlanView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(plan.sortedBlocks) { block in
-                    HStack(alignment: .top, spacing: WNTheme.Spacing.md) {
-                        Text(block.startTime.formatted(date: .omitted, time: .shortened))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .frame(width: 60, alignment: .leading)
-                            .padding(.top, 2)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(block.title)
-                                .font(.body.weight(.medium))
-
-                            Text("\(block.durationMinutes.formattedMinutes) · \(block.blockTypeEnum.displayName)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
+                    BlockRow(block: block, appState: appState) {
+                        refreshPlan()
                     }
-                    .padding(.vertical, WNTheme.Spacing.sm)
 
                     if block.id != plan.sortedBlocks.last?.id {
                         Divider()
                             .padding(.leading, 76)
                     }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Block Row
+
+struct BlockRow: View {
+    let block: WNScheduleBlock
+    let appState: AppState?
+    let refreshAction: () -> Void
+    
+    @State private var showActions = false
+    
+    var isPast: Bool { block.endTime <= .now }
+    var isCurrent: Bool { block.startTime <= .now && block.endTime > .now }
+    var isOverdue: Bool {
+        isPast && block.linkedTask?.statusEnum == .pending
+    }
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: WNTheme.Spacing.md) {
+            Text(block.startTime.formatted(date: .omitted, time: .shortened))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(isCurrent ? Color.accentColor : .secondary)
+                .frame(width: 60, alignment: .leading)
+                .padding(.top, 2)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(block.title)
+                    .font(isCurrent ? .body.weight(.bold) : .body.weight(.medium))
+                    .foregroundStyle(isPast && !isOverdue ? .secondary : .primary)
+                    .strikethrough(block.linkedTask?.statusEnum == .completed)
+                
+                HStack {
+                    Text("\(block.durationMinutes.formattedMinutes) · \(block.blockTypeEnum.displayName)")
+                    if isOverdue {
+                        Text("· Overdue")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(isOverdue ? .red : .secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, WNTheme.Spacing.sm)
+        .opacity((isPast && !isOverdue) ? 0.6 : 1.0)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let task = block.linkedTask, task.statusEnum == .pending {
+                showActions = true
+            }
+        }
+        .confirmationDialog(block.title, isPresented: $showActions, titleVisibility: .visible) {
+            if let task = block.linkedTask {
+                Button("Start Focus") {
+                    appState?.startFocus(for: task)
+                    appState?.selectedTab = .focus
+                }
+                Button("Complete") {
+                    withAnimation {
+                        appState?.completeTask(task)
+                        refreshAction()
+                    }
+                }
+                Button("Postpone") {
+                    withAnimation {
+                        appState?.postponeTask(task)
+                        refreshAction()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
             }
         }
     }
