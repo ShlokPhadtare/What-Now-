@@ -1,24 +1,78 @@
 //
-//  ContentView.swift
+//  RootView.swift
 //  What Now?
-//
-//  Created by Shlok Phadtare on 16/08/26.
 //
 
 import SwiftUI
 
-struct ContentView: View {
+/// The root view that switches between onboarding and the main tab interface.
+struct RootView: View {
+    @Environment(\.appState) private var appState
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        if let appState {
+            if appState.isOnboardingComplete {
+                MainTabView()
+                    .sheet(isPresented: Bindable(appState).isTaskEditorPresented) {
+                        TaskEditorView(task: appState.taskToEdit)
+                    }
+            } else {
+                // TODO: Phase 7 — OnboardingView
+                // For now, auto-complete onboarding so the app is usable.
+                MainTabView()
+                    .onAppear {
+                        appState.preferenceService.completeOnboarding()
+                    }
+                    .sheet(isPresented: Bindable(appState).isTaskEditorPresented) {
+                        TaskEditorView(task: appState.taskToEdit)
+                    }
+            }
         }
-        .padding()
     }
 }
 
-#Preview {
-    ContentView()
+// MARK: - Main Tab View
+
+/// The primary tab-based navigation structure with 4 core tabs.
+struct MainTabView: View {
+    @Environment(\.appState) private var appState
+
+    var body: some View {
+        if let appState = appState {
+            TabView(selection: Bindable(appState).selectedTab) {
+            Tab("Home", systemImage: "house", value: .home) {
+                NavigationStack {
+                    HomeView()
+                }
+            }
+
+            Tab("Plan", systemImage: "calendar", value: .plan) {
+                NavigationStack {
+                    PlanView()
+                }
+            }
+
+            Tab("Tasks", systemImage: "checklist", value: .tasks) {
+                NavigationStack {
+                    TaskListView()
+                }
+            }
+
+            Tab("AI", systemImage: "sparkles", value: .ai) {
+                AssistantView()
+            }
+        }
+        }
+    }
 }
+
+// MARK: - Tab Enum
+
+enum AppTab: String, Hashable {
+    case home
+    case plan
+    case tasks
+    case ai
+}
+
+
