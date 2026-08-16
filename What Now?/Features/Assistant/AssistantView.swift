@@ -40,59 +40,67 @@ struct AssistantView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if chatHistory.isEmpty {
-                    emptyState
-                } else {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(spacing: WNTheme.Spacing.lg) {
-                                ForEach(chatHistory) { message in
-                                    chatBubble(for: message)
-                                        .id(message.id)
-                                }
-                                if isProcessing {
-                                    progressBubble
-                                        .id("progress")
-                                }
+        VStack(spacing: 0) {
+            header
+            
+            if chatHistory.isEmpty {
+                emptyState
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: WNTheme.Spacing.lg) {
+                            ForEach(chatHistory) { message in
+                                chatBubble(for: message)
+                                    .id(message.id)
                             }
-                            .padding(.horizontal, WNTheme.Spacing.lg)
-                            .padding(.vertical, WNTheme.Spacing.md)
-                        }
-                        .onChange(of: chatHistory.count) { _, _ in
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                if let last = chatHistory.last {
-                                    proxy.scrollTo(last.id, anchor: .bottom)
-                                }
+                            if isProcessing {
+                                progressBubble
+                                    .id("progress")
                             }
                         }
-                        .onChange(of: isProcessing) { _, isProc in
-                            if isProc {
-                                withAnimation { proxy.scrollTo("progress", anchor: .bottom) }
+                        .padding(.horizontal, WNTheme.Spacing.lg)
+                        .padding(.vertical, WNTheme.Spacing.md)
+                    }
+                    .onChange(of: chatHistory.count) { _, _ in
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            if let last = chatHistory.last {
+                                proxy.scrollTo(last.id, anchor: .bottom)
                             }
                         }
                     }
-                }
-                
-                inputArea
-            }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Assistant")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .foregroundStyle(.secondary)
+                    .onChange(of: isProcessing) { _, isProc in
+                        if isProc {
+                            withAnimation { proxy.scrollTo("progress", anchor: .bottom) }
+                        }
+                    }
                 }
             }
-            .onAppear {
-                isFocused = true
-            }
+            
+            inputArea
+        }
+        .background(Color(uiColor: .systemGroupedBackground))
+        .onAppear {
+            isFocused = true
         }
     }
     
     // MARK: - Components
+    
+    private var header: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "sparkles")
+                .foregroundStyle(Color.accentColor)
+                .rotationEffect(Angle(degrees: isProcessing ? 180 : 0))
+                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: false), value: isProcessing)
+            
+            Text("Assistant")
+                .font(.headline)
+                .foregroundStyle(.primary)
+        }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial)
+    }
     
     @ViewBuilder
     private var emptyState: some View {
@@ -117,15 +125,45 @@ struct AssistantView: View {
                 }
                 
                 VStack(spacing: WNTheme.Spacing.sm) {
-                    suggestionButton("What should I do now?")
-                    suggestionButton("Plan my day")
-                    suggestionButton("I have 30 minutes")
+                    let suggestions = generateDynamicSuggestions()
+                    ForEach(suggestions, id: \.self) { suggestion in
+                        suggestionButton(suggestion)
+                    }
                 }
                 .padding(.top, WNTheme.Spacing.lg)
                 
                 Spacer()
             }
         }
+    }
+    
+    private func generateDynamicSuggestions() -> [String] {
+        var suggestions: [String] = []
+        
+        if let appState = appState {
+            if appState.activeFocusSession != nil {
+                suggestions.append("What should I do after this?")
+            }
+            
+            let pending = appState.taskService.pendingTasks()
+            if let topTask = pending.filter({ $0.priorityEnum == .high }).first ?? pending.first {
+                suggestions.append("Help me finish \(topTask.title)")
+            }
+            
+            if pending.isEmpty {
+                suggestions.append("Add something to my day")
+            } else {
+                suggestions.append("Plan my day")
+            }
+            
+            if suggestions.count < 3 {
+                suggestions.append("I have 30 minutes")
+            }
+        } else {
+            suggestions = ["What should I do now?", "Plan my day", "I have 30 minutes"]
+        }
+        
+        return Array(suggestions.prefix(3))
     }
     
     private func suggestionButton(_ text: String) -> some View {
@@ -296,8 +334,9 @@ struct AssistantView: View {
             Image(systemName: "sparkles")
                 .font(.title3)
                 .foregroundStyle(Color.accentColor)
-                .opacity(isProcessing ? 0.3 : 1.0)
-                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isProcessing)
+                .scaleEffect(isProcessing ? 1.1 : 0.9)
+                .opacity(isProcessing ? 0.4 : 1.0)
+                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isProcessing)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
             Spacer()
@@ -306,27 +345,33 @@ struct AssistantView: View {
     }
     
     private var inputArea: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField("Ask What Now...", text: $query, axis: .vertical)
-                .lineLimit(1...5)
-                .focused($isFocused)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            
-            Button(action: submitQuery) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 32))
-                    .foregroundStyle(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary.opacity(0.3) : Color.accentColor)
-                    .animation(.easeInOut(duration: 0.2), value: query)
+        VStack(spacing: 0) {
+            Divider()
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField("Ask What Now...", text: $query, axis: .vertical)
+                    .lineLimit(1...5)
+                    .focused($isFocused)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                
+                Button(action: submitQuery) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.white)
+                        .frame(width: 32, height: 32)
+                        .background(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(uiColor: .tertiarySystemFill) : Color.accentColor)
+                        .clipShape(Circle())
+                        .animation(.easeInOut(duration: 0.2), value: query)
+                }
+                .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isProcessing)
+                .padding(.trailing, 8)
+                .padding(.bottom, 6)
             }
-            .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isProcessing)
-            .padding(.trailing, 6)
-            .padding(.bottom, 6)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .background(.regularMaterial, in: Capsule())
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(.ultraThinMaterial)
     }
     
     // MARK: - Actions
@@ -334,6 +379,8 @@ struct AssistantView: View {
     private func submitQuery() {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let appState = appState else { return }
+        
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         
         withAnimation {
             chatHistory.append(ChatMessage(isUser: true, content: .text(text)))

@@ -46,6 +46,9 @@ final class AppState {
     /// The currently active focus session, if any.
     var activeFocusSession: WNFocusSession?
 
+    /// Whether the assistant sheet is presented.
+    var isAssistantPresented: Bool = false
+
     /// Whether the task editor sheet is presented.
     var isTaskEditorPresented: Bool = false
 

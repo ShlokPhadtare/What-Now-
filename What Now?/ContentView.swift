@@ -13,6 +13,9 @@ struct RootView: View {
         if let appState {
             if appState.isOnboardingComplete {
                 MainTabView()
+                    .sheet(isPresented: Bindable(appState).isAssistantPresented) {
+                        AssistantView()
+                    }
                     .sheet(isPresented: Bindable(appState).isTaskEditorPresented) {
                         TaskEditorView(task: appState.taskToEdit)
                     }
@@ -22,6 +25,9 @@ struct RootView: View {
                 MainTabView()
                     .onAppear {
                         appState.preferenceService.completeOnboarding()
+                    }
+                    .sheet(isPresented: Bindable(appState).isAssistantPresented) {
+                        AssistantView()
                     }
                     .sheet(isPresented: Bindable(appState).isTaskEditorPresented) {
                         TaskEditorView(task: appState.taskToEdit)
@@ -57,10 +63,6 @@ struct MainTabView: View {
                     TaskListView()
                 }
             }
-
-            Tab("AI", systemImage: "sparkles", value: .ai) {
-                AssistantView()
-            }
         }
         }
     }
@@ -72,7 +74,6 @@ enum AppTab: String, Hashable {
     case home
     case plan
     case tasks
-    case ai
 }
 
 

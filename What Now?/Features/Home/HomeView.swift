@@ -58,9 +58,9 @@ struct HomeView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    appState?.selectedTab = .plan
+                    appState?.isAssistantPresented = true
                 } label: {
-                    Image(systemName: "calendar")
+                    Image(systemName: "sparkles")
                 }
             }
 
@@ -106,9 +106,9 @@ struct HomeView: View {
 
             HStack(spacing: WNTheme.Spacing.lg) {
                 Button {
-                    appState?.selectedTab = .ai
+                    appState?.isAssistantPresented = true
                 } label: {
-                    Text(viewModel?.dynamicPlanActionTitle ?? "Plan my day")
+                    Text("Plan tomorrow")
                         .font(.headline)
                         .padding(.vertical, 6)
                         .padding(.horizontal, 12)
