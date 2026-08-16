@@ -63,6 +63,10 @@ struct MainTabView: View {
                     TaskListView()
                 }
             }
+
+            Tab("Focus", systemImage: "target", value: .focus) {
+                FocusView()
+            }
         }
         }
     }
@@ -74,6 +78,7 @@ enum AppTab: String, Hashable {
     case home
     case plan
     case tasks
+    case focus
 }
 
 

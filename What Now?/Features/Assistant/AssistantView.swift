@@ -219,28 +219,48 @@ struct AssistantView: View {
     
     @ViewBuilder
     private func actionResultBubble(title: String, duration: Int?, deadline: Date?) -> some View {
-        VStack(alignment: .leading, spacing: WNTheme.Spacing.sm) {
-            Label("Added", systemImage: "checkmark")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.green)
-            
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(.primary)
-            
-            HStack(spacing: 6) {
-                if let duration {
-                    Text(duration.formattedMinutes)
+        VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: WNTheme.Spacing.xs) {
+                Label("Added", systemImage: "checkmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .padding(.bottom, 2)
+                
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                
+                HStack(spacing: 6) {
+                    if let duration {
+                        Text(duration.formattedMinutes)
+                    }
+                    if duration != nil && deadline != nil {
+                        Text("·")
+                    }
+                    if let deadline {
+                        Text(deadline.relativeDay)
+                    }
                 }
-                if duration != nil && deadline != nil {
-                    Text("·")
-                }
-                if let deadline {
-                    Text(deadline.relativeDay)
-                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+            
+            Button {
+                if let appState = appState {
+                    let pending = appState.taskService.pendingTasks()
+                    if let match = pending.first(where: { $0.title == title }) {
+                        appState.startFocus(for: match)
+                        dismiss()
+                    }
+                }
+            } label: {
+                Text("Start")
+                    .font(.subheadline.weight(.medium))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(Color.accentColor, in: Capsule())
+                    .foregroundStyle(.white)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -388,7 +408,7 @@ struct AssistantView: View {
             isProcessing = true
         }
         
-        let history = chatHistory.dropLast().map { AIChatMessage(role: $0.isUser ? "user" : "assistant", content: $0.text) }
+        let history = chatHistory.dropLast().suffix(10).map { AIChatMessage(role: $0.isUser ? "user" : "assistant", content: $0.text) }
         
         Task {
             do {

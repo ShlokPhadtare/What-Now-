@@ -11,7 +11,7 @@ import SwiftData
 /// Default categories are seeded on first launch by `CategoryService`.
 /// Users can create custom categories.
 @Model
-final class WNCategory: Identifiable {
+final class WNCategory: Identifiable, Hashable {
     var id: UUID = UUID()
     var name: String = ""
     var symbolName: String = "folder"

@@ -34,8 +34,8 @@ class BaseOpenAIService: AIServiceProtocol {
         1. MULTI-ITEM PLANNING: If the user asks to plan their day/evening, or gives a time limit ("I only have two hours"), DO NOT output a single task. Output `proposePlan` with a realistic sequence of scheduled blocks.
         2. SMART REPLANNING: If the user says they missed a task, finished early, or wants to move something, DO NOT create a new duplicate task. Output `modifyPlan` to move/resize existing items based on their names.
         3. USER MEMORY: If the user explicitly states a preference (e.g. "I prefer studying after dinner", "I don't like mornings"), output `remember` so the system can save it long-term.
-        4. SMART CLARIFICATION: If missing vital info, ask briefly using `chatResponse`. If sensible defaults exist, act immediately.
-        5. TASK TITLE NORMALIZATION: When creating a task, extract the pure intent. (e.g. "Study python tomorrow for 30m" -> Title: "Study Python").
+        4. SMART CLARIFICATION: Enough information -> act immediately. Missing vital info -> ask EXACTLY ONE concise question using `chatResponse`. Optional info missing -> use a sensible default.
+        5. TASK TITLE NORMALIZATION: When creating a task, extract the pure intent. (e.g. "Study python tomorrow for 30m" -> Title: "Study Python"). Never use conversational filler as the title.
         
         Respond ONLY with a valid JSON object matching exactly ONE of these schemas:
         

@@ -93,6 +93,11 @@ struct HomeView: View {
     @ViewBuilder
     private var allCaughtUpSection: some View {
         VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
+            Text("ALL CAUGHT UP")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 4)
+
             Text("You're all caught up.")
                 .font(.system(size: 32, weight: .semibold))
                 .foregroundStyle(.primary)
@@ -100,37 +105,51 @@ struct HomeView: View {
             let hour = Calendar.current.component(.hour, from: Date())
             let timeString = hour < 12 ? "morning" : (hour < 17 ? "afternoon" : "evening")
             
-            Text("Enjoy your \(timeString).")
+            Text("Enjoy the rest of your \(timeString).")
                 .font(.title3)
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: WNTheme.Spacing.lg) {
+            VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
                 Button {
                     appState?.isAssistantPresented = true
                 } label: {
-                    Text("Plan tomorrow")
-                        .font(.headline)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
+                    HStack {
+                        Text("Plan tomorrow")
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.headline)
+                    .padding()
+                    .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .foregroundStyle(Color.accentColor)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
                 
-                Button("Add something") {
+                Button(action: {
                     appState?.presentNewTaskEditor()
+                }) {
+                    HStack {
+                        Text("Add a task")
+                        Spacer()
+                        Image(systemName: "plus")
+                    }
+                    .font(.headline)
+                    .padding()
+                    .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .foregroundStyle(.primary)
                 }
-                .font(.headline)
-                .foregroundStyle(.secondary)
             }
             .padding(.top, WNTheme.Spacing.lg)
         }
-        .padding(.top, WNTheme.Spacing.lg)
+        .padding(.top, WNTheme.Spacing.md)
     }
 
     @ViewBuilder
     private func nextMoveSection(_ task: WNTask, viewModel: HomeViewModel) -> some View {
         VStack(alignment: .leading, spacing: WNTheme.Spacing.lg) {
+            
+            Text("NEXT")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
             
             VStack(alignment: .leading, spacing: WNTheme.Spacing.xs) {
                 Text(task.title)
@@ -150,35 +169,39 @@ struct HomeView: View {
                         Text("Due \(deadline.relativeDay.lowercased())")
                             .foregroundStyle(task.isOverdue ? .red : .secondary)
                     }
+                    Text("·")
+                    Text(task.priorityEnum.displayName)
                 }
                 .font(.title3)
                 .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: WNTheme.Spacing.lg) {
+            VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
                 Button {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                         appState?.startFocus(for: task)
                         viewModel.refresh()
                     }
                 } label: {
-                    Text("Start")
-                        .font(.headline)
-                        .frame(minWidth: 100)
-                        .padding(.vertical, 6)
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-
-                Button("Postpone") {
-                    withAnimation {
-                        appState?.postponeTask(task)
-                        viewModel.refresh()
+                    HStack {
+                        Text("Start")
+                        Spacer()
+                        Image(systemName: "play.fill")
                     }
+                    .font(.headline)
+                    .padding()
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .foregroundStyle(.white)
                 }
-                .font(.headline)
-                .foregroundStyle(.secondary)
+
+                Button {
+                    appState?.selectedTab = .plan
+                } label: {
+                    Text("See today's plan")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                }
             }
             .padding(.top, WNTheme.Spacing.md)
         }
@@ -189,6 +212,10 @@ struct HomeView: View {
     private func activeFocusSection(_ session: WNFocusSession, remainingTime: TimeInterval) -> some View {
         VStack(alignment: .leading, spacing: WNTheme.Spacing.lg) {
             
+            Text("ACTIVE FOCUS")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.accentColor)
+            
             VStack(alignment: .leading, spacing: WNTheme.Spacing.sm) {
                 Text(session.task?.title ?? "Focus Session")
                     .font(.system(size: 36, weight: .bold))
@@ -196,57 +223,54 @@ struct HomeView: View {
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: WNTheme.Spacing.md) {
+                HStack(spacing: WNTheme.Spacing.sm) {
                     let totalSeconds = Double(max(1, session.plannedMinutes)) * 60.0
                     let progress = max(0, min(1, CGFloat(remainingTime / totalSeconds)))
                     
-                    ZStack {
-                        Circle()
-                            .stroke(Color.accentColor.opacity(0.15), lineWidth: 3)
-                        Circle()
-                            .trim(from: 0, to: progress)
-                            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                            .animation(.linear(duration: 1), value: progress)
-                    }
-                    .frame(width: 24, height: 24)
-
-                    Text(remainingTime.formattedDuration)
-                        .font(.system(size: 56, weight: .ultraLight, design: .rounded).monospacedDigit())
-                        .foregroundStyle(Color.primary)
+                    Text("\(remainingTime.formattedDuration) remaining")
+                        .font(.title3.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        
+                    Spacer()
                 }
             }
 
-            HStack(spacing: WNTheme.Spacing.lg) {
-                Button {
+            HStack(spacing: WNTheme.Spacing.md) {
+                Button(action: {
+                    withAnimation {
+                        appState?.endActiveFocusSession()
+                        viewModel?.refresh()
+                    }
+                }) {
+                    Text("Pause")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .foregroundStyle(.primary)
+                }
+
+                Button(action: {
                     withAnimation(.easeOut(duration: 0.3)) {
                         if let task = session.task {
                             appState?.completeTask(task)
                         }
                         viewModel?.refresh()
                     }
-                } label: {
-                    Label("Complete", systemImage: "checkmark")
+                }) {
+                    Text("Complete")
                         .font(.headline)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .foregroundStyle(Color.accentColor)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .tint(.green)
-                .controlSize(.large)
-
-                Button("Pause") {
-                    withAnimation {
-                        appState?.endActiveFocusSession()
-                        viewModel?.refresh()
-                    }
-                }
-                .font(.headline)
-                .foregroundStyle(.secondary)
             }
             .padding(.top, WNTheme.Spacing.md)
         }
+        .padding()
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color(uiColor: .separator).opacity(0.5), lineWidth: 0.5))
         .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 1.05)), removal: .opacity.combined(with: .move(edge: .top))))
     }
 }
