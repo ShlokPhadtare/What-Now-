@@ -29,6 +29,7 @@ struct FocusView: View {
         let remainingTime = appState?.focusService.remainingTime ?? 0
         let totalSeconds = Double(max(1, session.plannedMinutes)) * 60.0
         let progress = max(0, min(1, CGFloat(remainingTime / totalSeconds)))
+        let isPaused = appState?.isFocusPaused ?? false
         
         VStack(spacing: WNTheme.Spacing.xxl) {
             Spacer()
@@ -43,7 +44,7 @@ struct FocusView: View {
                     .stroke(Color.accentColor.opacity(0.15), lineWidth: 8)
                 Circle()
                     .trim(from: 0, to: progress)
-                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .stroke(isPaused ? Color.secondary : Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 1), value: progress)
                 
@@ -51,7 +52,11 @@ struct FocusView: View {
                     Text(remainingTime.formattedDuration)
                         .font(.system(size: 64, weight: .ultraLight, design: .rounded).monospacedDigit())
                     
-                    if let endTime = session.plannedEndTime as Date? {
+                    if isPaused {
+                        Text("Paused")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    } else if let endTime = session.plannedEndTime as Date? {
                         Text("Until \(endTime.formatted(date: .omitted, time: .shortened))")
                             .font(.headline)
                             .foregroundStyle(.secondary)
@@ -63,15 +68,22 @@ struct FocusView: View {
             HStack(spacing: WNTheme.Spacing.xl) {
                 Button(action: {
                     withAnimation {
-                        appState?.endActiveFocusSession()
+                        if isPaused {
+                            appState?.resumeActiveFocusSession()
+                        } else {
+                            appState?.pauseActiveFocusSession()
+                        }
                     }
                 }) {
-                    Text("Pause")
+                    Text(isPaused ? "Resume" : "Pause")
                         .font(.headline)
                         .padding(.vertical, 12)
                         .padding(.horizontal, 24)
-                        .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
-                        .foregroundStyle(.primary)
+                        .background(
+                            isPaused ? Color.accentColor.opacity(0.15) : Color(uiColor: .tertiarySystemFill),
+                            in: Capsule()
+                        )
+                        .foregroundStyle(isPaused ? Color.accentColor : .primary)
                 }
                 
                 Button(action: {

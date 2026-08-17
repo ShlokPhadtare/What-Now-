@@ -58,13 +58,12 @@ struct MainTabView: View {
                 }
             }
 
-            Tab("Focus", systemImage: "target", value: .focus) {
-                FocusView()
-            }
-
             Tab("AI", systemImage: "sparkles", value: .assistant) {
                 AssistantView()
             }
+        }
+        .fullScreenCover(item: Bindable(appState).activeFocusSession) { session in
+            FocusView()
         }
         }
     }
@@ -76,7 +75,6 @@ enum AppTab: String, Hashable {
     case home
     case plan
     case tasks
-    case focus
     case assistant
 }
 

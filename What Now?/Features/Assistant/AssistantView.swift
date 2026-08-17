@@ -251,7 +251,6 @@ struct AssistantView: View {
                     let pending = appState.taskService.pendingTasks()
                     if let match = pending.first(where: { $0.title == title }) {
                         appState.startFocus(for: match)
-                        appState.selectedTab = .focus
                     }
                 }
             } label: {
@@ -350,6 +349,7 @@ struct AssistantView: View {
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
+                .lineSpacing(4)
             
             if !options.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -363,12 +363,23 @@ struct AssistantView: View {
                                     .font(.subheadline.weight(.medium))
                                     .padding(.vertical, 8)
                                     .padding(.horizontal, 16)
-                                    .background(Color.accentColor.opacity(0.15), in: Capsule())
-                                    .foregroundStyle(Color.accentColor)
+                                    .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
+                                    .foregroundStyle(.primary)
                             }
                         }
+                        
+                        Button {
+                            query = "× Cancel"
+                            submitQuery()
+                        } label: {
+                            Text("× Cancel")
+                                .font(.subheadline)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 8)
                 }
             }
         }
@@ -483,6 +494,8 @@ struct AssistantView: View {
         guard !text.isEmpty, let appState = appState else { return }
         
         isFocused = false
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        
         if voiceInput.isRecording {
             voiceInput.stopRecording()
         }
@@ -530,8 +543,28 @@ struct AssistantView: View {
         
         switch intent {
         case .chatResponse(let message):
-            withAnimation {
-                appendMessage(ChatMessage(isUser: false, content: .text(message)))
+            // Handle special system intents returned by LocalAssistantService
+            if message == "SYSTEM_QUERY_MEMORY" {
+                let memories = appState?.memoryService.allMemories(enabledOnly: true) ?? []
+                let responseText: String
+                if memories.isEmpty {
+                    responseText = "I don't have anything remembered about you yet. As we chat, I'll pick up your preferences automatically."
+                } else {
+                    let memLines = memories.map { "• \($0.content)" }.joined(separator: "\n")
+                    responseText = "Here's what I remember about you:\n\n\(memLines)"
+                }
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text(responseText)))
+                }
+            } else if message == "SYSTEM_FORGET_ALL" {
+                appState?.memoryService.clearAll()
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text("Done — I've cleared all my memories about you.")))
+                }
+            } else {
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text(message)))
+                }
             }
             
         case .planDay:
@@ -579,7 +612,6 @@ struct AssistantView: View {
             let pending = appState?.taskService.pendingTasks() ?? []
             if let match = pending.first(where: { $0.title.lowercased().contains(taskTitleFragment.lowercased()) }) {
                 appState?.startFocus(for: match)
-                appState?.selectedTab = .focus
             } else {
                 withAnimation {
                     appendMessage(ChatMessage(isUser: false, content: .text("I couldn't find a task matching '\(taskTitleFragment)'.")))

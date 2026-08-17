@@ -15,6 +15,9 @@ final class FocusService: NSObject {
 
     var activeSession: WNFocusSession?
     private(set) var currentDate = Date()
+    
+    /// True when session is paused (timer stopped but session still active).
+    private(set) var isPaused: Bool = false
 
     init(context: ModelContext) {
         self.context = context
@@ -40,10 +43,32 @@ final class FocusService: NSObject {
         context.insert(session)
         activeSession = session
         currentDate = Date()
+        isPaused = false
         save()
         startTimer()
         NotificationManager.shared.scheduleFocusCompletion(taskTitle: task.title, in: TimeInterval(session.plannedMinutes * 60))
         return session
+    }
+
+    /// Pauses the active session. Stops the countdown timer without ending the session.
+    func pauseSession() {
+        guard activeSession != nil, !isPaused else { return }
+        timer?.invalidate()
+        timer = nil
+        isPaused = true
+        NotificationManager.shared.cancelFocusCompletion()
+        save()
+    }
+    
+    /// Resumes a paused session. Restarts the countdown timer.
+    func resumeSession() {
+        guard let session = activeSession, isPaused else { return }
+        isPaused = false
+        startTimer()
+        // Reschedule notification for remaining time
+        let remaining = max(1, remainingTime)
+        NotificationManager.shared.scheduleFocusCompletion(taskTitle: session.task?.title ?? "Focus", in: remaining)
+        save()
     }
 
     func endSession(completed: Bool) {
@@ -63,6 +88,7 @@ final class FocusService: NSObject {
         ))
 
         activeSession = nil
+        isPaused = false
         currentDate = endedAt
         timer?.invalidate()
         timer = nil

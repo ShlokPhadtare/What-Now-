@@ -19,6 +19,7 @@ struct TaskEditorView: View {
     @State private var selectedCategory: WNCategory?
     @State private var priority: TaskPriority = .medium
     @State private var estimatedMinutes: Int = 30
+    @State private var repeatFrequency: RepeatFrequency? = nil
     @State private var categories: [WNCategory] = []
 
     @FocusState private var isTitleFocused: Bool
@@ -73,6 +74,13 @@ struct TaskEditorView: View {
                             }
                         }
                     }
+                    
+                    Picker("Repeat", selection: $repeatFrequency) {
+                        Text("Never").tag(nil as RepeatFrequency?)
+                        ForEach(RepeatFrequency.allCases) { freq in
+                            Text(freq.displayName).tag(freq as RepeatFrequency?)
+                        }
+                    }
                 }
 
                 // Notes / Description
@@ -125,6 +133,13 @@ struct TaskEditorView: View {
             } else {
                 selectedDay = .noDate
             }
+            
+            // Load existing repeat schedule
+            if let schedule = task.repeatSchedule {
+                repeatFrequency = schedule.frequency
+            } else {
+                repeatFrequency = nil
+            }
         }
     }
 
@@ -147,6 +162,20 @@ struct TaskEditorView: View {
             targetDeadline = nil
         }
 
+        // Build repeat schedule from selection
+        var schedule: RepeatSchedule? = nil
+        if let freq = repeatFrequency {
+            switch freq {
+            case .daily: schedule = .daily
+            case .weekdays: schedule = .weekdays
+            case .weekends: schedule = .weekends
+            case .weekly: schedule = .weekly(anchor: Date.now)
+            case .monthly: schedule = .monthly(anchor: Date.now)
+            case .everyXDays: schedule = .every(2)
+            case .custom: schedule = .custom(days: Set(2...6))
+            }
+        }
+        
         if let task {
             task.title = trimmedTitle
             task.taskDescription = description
@@ -154,6 +183,7 @@ struct TaskEditorView: View {
             task.priorityEnum = priority
             task.deadline = targetDeadline
             task.estimatedMinutes = estimatedMinutes
+            task.repeatSchedule = schedule
             appState?.taskService.save()
         } else {
             appState?.taskService.createTask(
@@ -164,6 +194,7 @@ struct TaskEditorView: View {
                 deadline: targetDeadline,
                 estimatedMinutes: estimatedMinutes,
                 preferredTimeOfDay: nil,
+                repeatSchedule: schedule,
                 notes: nil
             )
         }

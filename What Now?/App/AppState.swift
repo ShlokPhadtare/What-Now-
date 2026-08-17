@@ -76,6 +76,9 @@ final class AppState {
 
         // Seed defaults on first launch
         categoryService.seedDefaultsIfNeeded()
+        
+        // Request notification permissions on first launch
+        NotificationManager.shared.requestAuthorization()
     }
 
     // MARK: - Convenience
@@ -126,6 +129,20 @@ final class AppState {
     func endActiveFocusSession() {
         focusService.endSession(completed: false)
         activeFocusSession = nil
+    }
+    
+    /// Pauses the active focus session without ending it.
+    func pauseActiveFocusSession() {
+        focusService.pauseSession()
+    }
+    
+    /// Resumes a paused focus session.
+    func resumeActiveFocusSession() {
+        focusService.resumeSession()
+    }
+    
+    var isFocusPaused: Bool {
+        focusService.isPaused
     }
 }
 

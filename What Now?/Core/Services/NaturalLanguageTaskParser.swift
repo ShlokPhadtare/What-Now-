@@ -36,18 +36,74 @@ enum NaturalLanguageTaskParser {
         } else if lower.contains("today") {
             result.deadline = now
         }
+        
+        // Extract specific time (e.g., "at 7pm", "at 7:30pm", "at 19:00")
+        if let specificHour = parseSpecificHour(from: lower) {
+            let base = result.deadline ?? now
+            if let withHour = Calendar.current.date(bySettingHour: specificHour, minute: 0, second: 0, of: base) {
+                result.deadline = withHour
+            }
+        }
 
-        if let minutes = firstInteger(before: "min", in: lower) ?? firstInteger(before: "minute", in: lower) {
+        // Duration parsing — supports: "30 min", "30 minute", "30m", "1h", "2h", "1 hour"
+        if let minutes = parseDuration(from: lower) {
             result.estimatedMinutes = minutes
         }
-        if lower.contains("night") || lower.contains("evening") || lower.contains("pm") { result.preferredTime = .evening }
-        else if lower.contains("morning") || lower.contains("am") { result.preferredTime = .morning }
+        
+        if lower.contains("night") || lower.contains("evening") || lower.contains(" pm") { result.preferredTime = .evening }
+        else if lower.contains("morning") || lower.contains(" am") { result.preferredTime = .morning }
         else if lower.contains("afternoon") { result.preferredTime = .afternoon }
         
         if lower.contains("high priority") || lower.contains("urgent") || lower.contains("critical") { result.priority = .high }
         else if lower.contains("low priority") { result.priority = .low }
 
         return result
+    }
+    
+    /// Parse duration from common patterns: "30 min", "30m", "1h", "1 hour", "45 minutes"
+    static func parseDuration(from lower: String) -> Int? {
+        // Match "X hour" or "Xh"
+        let hourPattern = #"\b(\d{1,2})\s*h(?:our)?s?\b"#
+        if let regex = try? NSRegularExpression(pattern: hourPattern),
+           let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
+           let range = Range(match.range(at: 1), in: lower),
+           let hours = Int(lower[range]) {
+            return hours * 60
+        }
+        
+        // Match "X min", "X minute", "Xm" (standalone, not part of a word)
+        let minPattern = #"\b(\d{1,3})\s*m(?:in(?:ute)?s?)?\b"#
+        if let regex = try? NSRegularExpression(pattern: minPattern),
+           let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
+           let range = Range(match.range(at: 1), in: lower),
+           let mins = Int(lower[range]) {
+            return mins
+        }
+        
+        return nil
+    }
+    
+    /// Parse "at 7pm", "at 7:30 pm", "at 19:00" → returns the hour (24h)
+    private static func parseSpecificHour(from lower: String) -> Int? {
+        // Match "at 7pm", "at 7 pm"
+        let pattern = #"\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)) else { return nil }
+        
+        guard let hourRange = Range(match.range(at: 1), in: lower),
+              var hour = Int(lower[hourRange]) else { return nil }
+        
+        // Handle am/pm
+        if let modifierRange = Range(match.range(at: 3), in: lower) {
+            let modifier = String(lower[modifierRange])
+            if modifier == "pm" && hour < 12 { hour += 12 }
+            else if modifier == "am" && hour == 12 { hour = 0 }
+        } else if hour < 6 {
+            // Ambiguous, assume PM for hours < 6 with no am/pm
+            hour += 12
+        }
+        
+        return hour
     }
 
     private static func weekdayMatches(in value: String) -> Set<Int> {

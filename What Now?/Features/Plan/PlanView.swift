@@ -42,6 +42,13 @@ struct PlanView: View {
                         }
                         .font(.subheadline)
                         .disabled(isReplanning)
+                    } else if !pendingTasks.isEmpty {
+                        Button {
+                            generatePlan()
+                        } label: {
+                            Text("Generate")
+                        }
+                        .font(.subheadline)
                     }
                 }
                 .padding(.vertical, WNTheme.Spacing.xs)
@@ -176,7 +183,8 @@ struct BlockRow: View {
         .opacity((isPast && !isOverdue) ? 0.6 : 1.0)
         .contentShape(Rectangle())
         .onTapGesture {
-            if let task = block.linkedTask, task.statusEnum == .pending {
+            if let task = block.linkedTask,
+               task.statusEnum == .pending || task.statusEnum == .inProgress {
                 showActions = true
             }
         }
@@ -184,11 +192,35 @@ struct BlockRow: View {
             if let task = block.linkedTask {
                 Button("Start Focus") {
                     appState?.startFocus(for: task)
-                    appState?.selectedTab = .focus
                 }
                 Button("Complete") {
                     withAnimation {
                         appState?.completeTask(task)
+                        refreshAction()
+                    }
+                }
+                Button("Move to Later Today") {
+                    withAnimation {
+                        // Move block start to 1 hour from now
+                        let newStart = Date.now.addingTimeInterval(.hours(1))
+                        let duration = block.durationMinutes
+                        block.startTime = newStart
+                        block.endTime = newStart.addingTimeInterval(.minutes(duration))
+                        appState?.taskService.save()
+                        refreshAction()
+                    }
+                }
+                Button("Move to Tomorrow") {
+                    withAnimation {
+                        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: block.startTime) ?? block.startTime
+                        let duration = block.durationMinutes
+                        block.startTime = tomorrow
+                        block.endTime = tomorrow.addingTimeInterval(.minutes(duration))
+                        if let task = block.linkedTask {
+                            let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: Date.now)
+                            task.deadline = nextDay
+                            appState?.taskService.save()
+                        }
                         refreshAction()
                     }
                 }

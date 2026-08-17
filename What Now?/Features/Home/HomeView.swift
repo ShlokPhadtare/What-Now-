@@ -210,11 +210,13 @@ struct HomeView: View {
 
     @ViewBuilder
     private func activeFocusSection(_ session: WNFocusSession, remainingTime: TimeInterval) -> some View {
+        let isPaused = appState?.isFocusPaused ?? false
+        
         VStack(alignment: .leading, spacing: WNTheme.Spacing.lg) {
             
-            Text("ACTIVE FOCUS")
+            Text(isPaused ? "PAUSED" : "ACTIVE FOCUS")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(isPaused ? .secondary : Color.accentColor)
             
             VStack(alignment: .leading, spacing: WNTheme.Spacing.sm) {
                 Text(session.task?.title ?? "Focus Session")
@@ -225,11 +227,11 @@ struct HomeView: View {
 
                 HStack(spacing: WNTheme.Spacing.sm) {
                     let totalSeconds = Double(max(1, session.plannedMinutes)) * 60.0
-                    let progress = max(0, min(1, CGFloat(remainingTime / totalSeconds)))
+                    let _ = max(0, min(1, CGFloat(remainingTime / totalSeconds)))
                     
                     Text("\(remainingTime.formattedDuration) remaining")
                         .font(.title3.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isPaused ? .secondary : .primary)
                         
                     Spacer()
                 }
@@ -238,16 +240,23 @@ struct HomeView: View {
             HStack(spacing: WNTheme.Spacing.md) {
                 Button(action: {
                     withAnimation {
-                        appState?.endActiveFocusSession()
+                        if isPaused {
+                            appState?.resumeActiveFocusSession()
+                        } else {
+                            appState?.pauseActiveFocusSession()
+                        }
                         viewModel?.refresh()
                     }
                 }) {
-                    Text("Pause")
+                    Text(isPaused ? "Resume" : "Pause")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .foregroundStyle(.primary)
+                        .background(
+                            isPaused ? Color.accentColor.opacity(0.15) : Color(uiColor: .tertiarySystemFill),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        )
+                        .foregroundStyle(isPaused ? Color.accentColor : .primary)
                 }
 
                 Button(action: {

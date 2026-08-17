@@ -189,6 +189,13 @@ struct AIConfigurationView: View {
     @State private var openAIKey: String = ""
     @State private var lmStudioKey: String = ""
     
+    // Connection Status
+    @State private var isCheckingConnection: Bool = false
+    
+    var providerStatus: ProviderConnectionStatus {
+        appState?.intelligenceRouter.providerStatus ?? .unknown
+    }
+    
     var body: some View {
         Form {
             Section {
@@ -203,6 +210,27 @@ struct AIConfigurationView: View {
                 .padding(.vertical, WNTheme.Spacing.sm)
             }
             
+            // Connection Status Row
+            Section {
+                HStack {
+                    Label("Status", systemImage: statusIcon)
+                        .foregroundStyle(statusColor)
+                    Spacer()
+                    if isCheckingConnection {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(providerStatus.displayName)
+                            .foregroundStyle(statusColor)
+                            .font(.subheadline)
+                    }
+                }
+                
+                Button("Test Connection") {
+                    checkConnection()
+                }
+                .disabled(isCheckingConnection)
+            }
+            
             if provider == .openAI {
                 openAISection
             } else {
@@ -213,8 +241,26 @@ struct AIConfigurationView: View {
         .onAppear {
             loadSettings()
         }
-        .onChange(of: provider) { oldValue, newValue in
+        .onChange(of: provider) { _, newValue in
             appState?.preferenceService.aiProvider = newValue
+            // Check connection when provider changes
+            checkConnection()
+        }
+    }
+    
+    private var statusIcon: String {
+        switch providerStatus {
+        case .unknown: return "circle.dotted"
+        case .connected: return "checkmark.circle.fill"
+        case .unavailable: return "xmark.circle.fill"
+        }
+    }
+    
+    private var statusColor: Color {
+        switch providerStatus {
+        case .unknown: return .secondary
+        case .connected: return .green
+        case .unavailable: return .red
         }
     }
     
@@ -292,14 +338,24 @@ struct AIConfigurationView: View {
         if provider == .lmStudio {
             fetchModels()
         }
+        
+        checkConnection()
+    }
+    
+    private func checkConnection() {
+        guard let router = appState?.intelligenceRouter else { return }
+        isCheckingConnection = true
+        Task {
+            await router.checkProviderReachability()
+            await MainActor.run {
+                self.isCheckingConnection = false
+            }
+        }
     }
     
     private func fetchModels() {
-        guard let service = appState?.aiService as? LMStudioAssistantService else {
-            // Might be configured as OpenAI, instantiate temporary one
-            fetchModelsTemporarily()
-            return
-        }
+        // Always use intelligenceRouter.lmStudioService directly — no unsafe casting needed
+        guard let service = appState?.intelligenceRouter.lmStudioService else { return }
         
         isLoadingModels = true
         Task {
@@ -317,23 +373,6 @@ struct AIConfigurationView: View {
                 await MainActor.run {
                     self.isLoadingModels = false
                 }
-            }
-        }
-    }
-    
-    private func fetchModelsTemporarily() {
-        guard let appState = appState else { return }
-        let tempService = LMStudioAssistantService(preferenceService: appState.preferenceService)
-        isLoadingModels = true
-        Task {
-            do {
-                let models = try await tempService.fetchAvailableModels()
-                await MainActor.run {
-                    self.availableModels = models
-                    self.isLoadingModels = false
-                }
-            } catch {
-                await MainActor.run { self.isLoadingModels = false }
             }
         }
     }

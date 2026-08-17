@@ -28,7 +28,8 @@ final class OpenAIAssistantService: BaseOpenAIService {
     
     override func processQuery(_ query: String, history: [AIChatMessage], context: String) async throws -> AIAssistantIntent {
         if apiKey.isEmpty {
-            return .chatResponse(message: "Please configure your OpenAI API Key in Settings to enable the assistant.")
+            // Throw so the IntelligenceRouter's catch block fires and local fallback activates.
+            throw URLError(.userAuthenticationRequired)
         }
         
         return try await super.processQuery(query, history: history, context: context)
