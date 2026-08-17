@@ -7,7 +7,16 @@ import Foundation
 
 enum LocalConversationState: Equatable {
     case idle
-    case creatingTask(title: String, date: Date?, duration: Int?, priority: TaskPriority?, dateResolved: Bool)
+    case creatingTask(
+        title: String,
+        date: Date?,
+        time: TimeOfDay?,
+        duration: Int?,
+        priority: TaskPriority?,
+        dateResolved: Bool,
+        timeResolved: Bool,
+        durationResolved: Bool
+    )
 }
 
 final class LocalAssistantService: AIServiceProtocol {
@@ -46,15 +55,18 @@ final class LocalAssistantService: AIServiceProtocol {
         }
         
         // 1. Check if we are in the middle of a task creation flow
-        if case .creatingTask(let title, let date, let duration, let priority, let dateResolved) = state {
+        if case .creatingTask(let title, let date, let time, let duration, let priority, let dateResolved, let timeResolved, let durationResolved) = state {
             return processTaskCreationState(
                 query: text,
                 lower: lower,
                 title: title,
                 date: date,
+                time: time,
                 duration: duration,
                 priority: priority,
-                dateResolved: dateResolved
+                dateResolved: dateResolved,
+                timeResolved: timeResolved,
+                durationResolved: durationResolved
             )
         }
         
@@ -115,17 +127,22 @@ final class LocalAssistantService: AIServiceProtocol {
     private func processNewTaskCommand(query: String) -> AIAssistantIntent {
         let parsed = NaturalLanguageTaskParser.parse(query)
         if parsed.title.isEmpty {
-            return .chatResponse(message: "I didn't quite catch what you wanted to add.")
+            return .chatResponse(message: "I didn't quite catch what you wanted to add. What should I call it?")
         }
         
-        // If we already have all the info, create immediately
         let dateResolved = parsed.deadline != nil
+        let timeResolved = parsed.preferredTime != nil
+        let durationResolved = parsed.estimatedMinutes != nil
+        
         state = .creatingTask(
             title: parsed.title,
             date: parsed.deadline,
+            time: parsed.preferredTime,
             duration: parsed.estimatedMinutes,
             priority: parsed.priority,
-            dateResolved: dateResolved
+            dateResolved: dateResolved,
+            timeResolved: timeResolved,
+            durationResolved: durationResolved
         )
         
         return advanceStateMachine()
@@ -136,90 +153,140 @@ final class LocalAssistantService: AIServiceProtocol {
         lower: String,
         title: String,
         date: Date?,
+        time: TimeOfDay?,
         duration: Int?,
         priority: TaskPriority?,
-        dateResolved: Bool
+        dateResolved: Bool,
+        timeResolved: Bool,
+        durationResolved: Bool
     ) -> AIAssistantIntent {
         var newDate = date
+        var newTime = time
         var newDuration = duration
-        var newPriority = priority
+        let newPriority = priority
         var newDateResolved = dateResolved
+        var newTimeResolved = timeResolved
+        var newDurationResolved = durationResolved
         
         if !dateResolved {
-            // We are waiting for date answer
             if let d = parseDateOption(lower) {
                 newDate = d
                 newDateResolved = true
             } else if lower == "no date" || lower == "later" || lower == "skip" || lower == "none" {
-                // User skipped date — treat as no specific date (nil)
                 newDate = nil
                 newDateResolved = true
+                newTimeResolved = true // Skip time if no date
             } else {
-                // Try NL parser as fallback
                 let parsed = NaturalLanguageTaskParser.parse(query)
                 if let d = parsed.deadline {
                     newDate = d
                     newDateResolved = true
                 }
             }
-        } else if newDuration == nil {
-            // We are waiting for duration answer
-            if let d = parseDurationOption(lower) {
-                newDuration = d
-            } else if lower == "default" || lower == "skip" {
-                newDuration = preferenceService.profile.preferredFocusMinutes
+        } else if !timeResolved {
+            if let t = parseTimeOption(lower) {
+                newTime = t
+                newTimeResolved = true
+            } else if lower == "any time" || lower == "skip" {
+                newTime = nil
+                newTimeResolved = true
             } else {
-                // Try NL parser
-                if let d = NaturalLanguageTaskParser.parseDuration(from: lower) {
-                    newDuration = d
-                } else if let num = Int(lower.filter { $0.isNumber }), num > 0 {
-                    // Direct number entry
-                    newDuration = num
-                } else {
-                    // Use default if unparseable
-                    newDuration = preferenceService.profile.preferredFocusMinutes
+                let parsed = NaturalLanguageTaskParser.parse(query)
+                if let t = parsed.preferredTime {
+                    newTime = t
+                    newTimeResolved = true
+                } else if parsed.deadline != nil {
+                    // They might have typed "at 7pm"
+                    newDate = parsed.deadline
+                    newTimeResolved = true
                 }
             }
-        } else if newPriority == nil {
-            // We are waiting for priority answer
-            if let p = parsePriorityOption(lower) {
-                newPriority = p
+        } else if !durationResolved {
+            if let d = parseDurationOption(lower) {
+                newDuration = d
+                newDurationResolved = true
+            } else if lower == "default" || lower == "skip" {
+                newDuration = preferenceService.profile.preferredFocusMinutes
+                newDurationResolved = true
+            } else if let d = NaturalLanguageTaskParser.parseDuration(from: lower) {
+                newDuration = d
+                newDurationResolved = true
+            } else if let num = Int(lower.filter { $0.isNumber }), num > 0 {
+                newDuration = num
+                newDurationResolved = true
             } else {
-                // Default to medium if unparseable
-                newPriority = .medium
+                newDuration = preferenceService.profile.preferredFocusMinutes
+                newDurationResolved = true
             }
+        } else {
+            // Should not happen, but fallback
+            state = .idle
+            return .chatResponse(message: "Done.")
         }
         
-        state = .creatingTask(title: title, date: newDate, duration: newDuration, priority: newPriority, dateResolved: newDateResolved)
+        state = .creatingTask(
+            title: title,
+            date: newDate,
+            time: newTime,
+            duration: newDuration,
+            priority: newPriority,
+            dateResolved: newDateResolved,
+            timeResolved: newTimeResolved,
+            durationResolved: newDurationResolved
+        )
         return advanceStateMachine()
     }
     
     private func advanceStateMachine() -> AIAssistantIntent {
-        guard case .creatingTask(let title, let date, let duration, _, let dateResolved) = state else {
+        guard case .creatingTask(let title, let date, let time, let duration, _, let dateResolved, let timeResolved, let durationResolved) = state else {
             return .chatResponse(message: "Conversation state error.")
         }
         
-        // 1. Need Date? (only ask if not yet resolved)
         if !dateResolved {
             return .askQuestion(
-                prompt: "When would you like to do '\(title)'?",
+                prompt: "When would you like to do it?",
                 options: ["Today", "Tomorrow", "Later", "No Date"],
                 expectedField: "date"
             )
         }
         
-        // 2. Need Duration?
-        if duration == nil {
+        if !timeResolved {
+            return .askQuestion(
+                prompt: "What time works?",
+                options: ["Morning", "Afternoon", "Evening", "Any Time"],
+                expectedField: "time"
+            )
+        }
+        
+        if !durationResolved {
+            let prefStr = "\(preferenceService.profile.preferredFocusMinutes)m"
+            let options = ["15m", "30m", "45m", "1h", "Custom"].map { $0 == prefStr ? "[\($0)]" : $0 }
             return .askQuestion(
                 prompt: "How long should I plan for?",
-                options: ["15m", "30m", "45m", "1h", "Default"],
+                options: options, // Highlight default but don't force
                 expectedField: "duration"
             )
         }
         
-        // 3. All collected — skip priority question, use parsed priority or default
+        // All collected
         state = .idle
-        return .createTask(title: title, durationMinutes: duration, deadline: date)
+        
+        // Merge TimeOfDay into Date if Date exists but is just midnight
+        var finalDate = date
+        if let d = date, let t = time {
+            // Very simplified: just use the morning/afternoon/evening hours
+            let calendar = Calendar.current
+            var hour = 12
+            switch t {
+            case .morning: hour = 9
+            case .afternoon: hour = 14
+            case .evening: hour = 19
+            case .anytime: hour = 12
+            }
+            finalDate = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: d) ?? d
+        }
+        
+        return .createTask(title: title, durationMinutes: duration, deadline: finalDate)
     }
     
     // MARK: - Option Parsers
@@ -237,28 +304,24 @@ final class LocalAssistantService: AIServiceProtocol {
         }
     }
     
-    /// Parses user-tapped duration options like "15m", "30m", "45m", "1h"
+    private func parseTimeOption(_ lower: String) -> TimeOfDay? {
+        if lower.contains("morning") { return .morning }
+        if lower.contains("afternoon") { return .afternoon }
+        if lower.contains("evening") || lower.contains("night") { return .evening }
+        return nil
+    }
+    
     private func parseDurationOption(_ lower: String) -> Int? {
-        switch lower {
+        let unbracketed = lower.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: "")
+        switch unbracketed {
         case "15m", "15 min", "15 minutes": return 15
         case "30m", "30 min", "30 minutes": return 30
         case "45m", "45 min", "45 minutes": return 45
         case "1h", "1 hour", "60m", "60 min": return 60
         case "2h", "2 hours": return 120
-        case "default": return preferenceService.profile.preferredFocusMinutes
+        case "custom": return nil // Will fall back to typing Custom number
         default:
-            // Try the general parser
             return NaturalLanguageTaskParser.parseDuration(from: lower)
-        }
-    }
-    
-    /// Parses user-tapped priority options like "High", "Medium", "Low"
-    private func parsePriorityOption(_ lower: String) -> TaskPriority? {
-        switch lower {
-        case "high", "urgent", "critical": return .high
-        case "medium", "normal", "mid": return .medium
-        case "low": return .low
-        default: return nil
         }
     }
 }

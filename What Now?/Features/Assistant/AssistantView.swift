@@ -201,8 +201,8 @@ struct AssistantView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .lineSpacing(4)
-                case .actionResult(let title, let duration, let deadline):
-                    actionResultBubble(title: title, duration: duration, deadline: deadline)
+                case .actionResult(let title, let duration, let deadline, let taskId):
+                    actionResultBubble(title: title, duration: duration, deadline: deadline, taskId: taskId)
                 case .planProposal(let blocks):
                     planProposalBubble(blocks: blocks)
                 case .planModification(let actions):
@@ -219,7 +219,7 @@ struct AssistantView: View {
     }
     
     @ViewBuilder
-    private func actionResultBubble(title: String, duration: Int?, deadline: Date?) -> some View {
+    private func actionResultBubble(title: String, duration: Int?, deadline: Date?, taskId: String?) -> some View {
         VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
             VStack(alignment: .leading, spacing: WNTheme.Spacing.xs) {
                 Label("Added", systemImage: "checkmark")
@@ -246,20 +246,50 @@ struct AssistantView: View {
                 .foregroundStyle(.secondary)
             }
             
-            Button {
-                if let appState = appState {
-                    let pending = appState.taskService.pendingTasks()
-                    if let match = pending.first(where: { $0.title == title }) {
-                        appState.startFocus(for: match)
+            HStack(spacing: WNTheme.Spacing.md) {
+                Button {
+                    if let appState = appState {
+                        let match: WNTask?
+                        if let taskId = taskId, let id = UUID(uuidString: taskId) {
+                            match = appState.taskService.pendingTasks().first { $0.id == id }
+                        } else {
+                            match = appState.taskService.pendingTasks().first { $0.title == title }
+                        }
+                        
+                        if let task = match {
+                            appState.startFocus(for: task)
+                        }
                     }
+                } label: {
+                    Text("Start")
+                        .font(.subheadline.weight(.medium))
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color.accentColor, in: Capsule())
+                        .foregroundStyle(.white)
                 }
-            } label: {
-                Text("Start")
-                    .font(.subheadline.weight(.medium))
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 16)
-                    .background(Color.accentColor, in: Capsule())
-                    .foregroundStyle(.white)
+                
+                Button {
+                    if let appState = appState {
+                        let match: WNTask?
+                        if let taskId = taskId, let id = UUID(uuidString: taskId) {
+                            match = appState.taskService.pendingTasks().first { $0.id == id }
+                        } else {
+                            match = appState.taskService.pendingTasks().first { $0.title == title }
+                        }
+                        
+                        if let task = match {
+                            appState.presentTaskEditor(for: task)
+                        }
+                    }
+                } label: {
+                    Text("Edit")
+                        .font(.subheadline.weight(.medium))
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
+                        .foregroundStyle(.primary)
+                }
             }
         }
         .padding(16)
@@ -356,8 +386,14 @@ struct AssistantView: View {
                     HStack(spacing: 8) {
                         ForEach(options, id: \.self) { option in
                             Button {
-                                query = option
-                                submitQuery()
+                                let rawOption = option.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: "")
+                                if rawOption == "Custom" || rawOption == "Choose Time" || rawOption == "Choose Date" {
+                                    query = ""
+                                    isFocused = true
+                                } else {
+                                    query = rawOption
+                                    submitQuery()
+                                }
                             } label: {
                                 Text(option)
                                     .font(.subheadline.weight(.medium))
@@ -594,7 +630,7 @@ struct AssistantView: View {
             }
             
         case .createTask(let title, let duration, let deadline):
-            appState?.taskService.createTask(
+            if let task = appState?.taskService.createTask(
                 title: title,
                 taskDescription: "",
                 category: nil,
@@ -603,9 +639,10 @@ struct AssistantView: View {
                 estimatedMinutes: duration,
                 preferredTimeOfDay: nil,
                 notes: nil
-            )
-            withAnimation {
-                appendMessage(ChatMessage(isUser: false, content: .actionResult(title: title, duration: duration, deadline: deadline)))
+            ) {
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .actionResult(title: title, duration: duration, deadline: deadline, taskId: task.id.uuidString)))
+                }
             }
             
         case .startFocus(let taskTitleFragment):

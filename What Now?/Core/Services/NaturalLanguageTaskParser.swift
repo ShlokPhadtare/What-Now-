@@ -121,17 +121,25 @@ enum NaturalLanguageTaskParser {
     }
 
     private static func cleanedTitle(from value: String) -> String {
-        let markers = [" every ", " weekdays", " weekends", " tomorrow", " today", " weekly", " monthly", " monday", " tuesday", " wednesday", " thursday", " friday", " saturday", " sunday", " for "]
-        let prefixes = ["add ", "create ", "schedule ", "remind me to ", "task "]
+        let markers = [" every ", " weekdays", " weekends", " tomorrow", " today", " weekly", " monthly", " monday", " tuesday", " wednesday", " thursday", " friday", " saturday", " sunday", " for ", " at "]
+        let prefixes = [
+            "add ", "create ", "schedule ", "remind me to ", "task ",
+            "i need to ", "i want to ", "i have to ", "please ", "can you ", "could you "
+        ]
         
         var lower = value.lowercased()
         var startIdx = value.startIndex
         
-        for prefix in prefixes {
-            if lower.hasPrefix(prefix) {
-                startIdx = value.index(value.startIndex, offsetBy: prefix.count)
-                lower = String(lower[startIdx...])
-                break
+        var prefixFound = true
+        while prefixFound {
+            prefixFound = false
+            for prefix in prefixes {
+                if lower.hasPrefix(prefix) {
+                    startIdx = value.index(startIdx, offsetBy: prefix.count)
+                    lower = String(lower.dropFirst(prefix.count))
+                    prefixFound = true
+                    break
+                }
             }
         }
         
@@ -147,6 +155,11 @@ enum NaturalLanguageTaskParser {
                 finalTitle.removeLast(s.count)
                 finalTitle = finalTitle.trimmingCharacters(in: .whitespacesAndNewlines)
             }
+        }
+        
+        // If the title is empty after stripping, just use the original value as a fallback
+        if finalTitle.isEmpty {
+            finalTitle = value.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         
         return finalTitle
