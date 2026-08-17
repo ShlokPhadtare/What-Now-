@@ -35,11 +35,13 @@ struct AssistantView: View {
                                 if isProcessing {
                                     progressBubble
                                         .id("progress")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }
-                            .padding(.horizontal, WNTheme.Spacing.lg)
+                            .padding(.horizontal, 16)
                             .padding(.top, WNTheme.Spacing.md)
-                            .padding(.bottom, 120) // space for floating composer
+                            .padding(.bottom, 120)
+                            .frame(maxWidth: .infinity)
                         }
                         .onChange(of: appState?.activeChatSession?.messages.count ?? 0) { _, _ in
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -188,33 +190,62 @@ struct AssistantView: View {
                 Spacer(minLength: 40)
                 Text(LocalizedStringKey(message.text))
                     .font(.body)
+                    .multilineTextAlignment(.leading)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .foregroundStyle(.white)
+                    .contextMenu {
+                        Button {
+                            UIPasteboard.general.string = message.text
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                        Button(role: .destructive) {
+                            deleteMessage(withId: message.id)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
             } else {
-                switch message.content {
-                case .text(let text):
-                    Text(LocalizedStringKey(text))
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .lineSpacing(4)
-                case .actionResult(let title, let duration, let deadline, let taskId):
-                    actionResultBubble(title: title, duration: duration, deadline: deadline, taskId: taskId)
-                case .planProposal(let blocks):
-                    planProposalBubble(blocks: blocks)
-                case .planModification(let actions):
-                    planModificationBubble(actions: actions)
-                case .memorySaved(let fact):
-                    memoryBubble(fact: fact)
-                case .question(let prompt, let options, _):
-                    questionBubble(prompt: prompt, options: options)
+                VStack(alignment: .leading) {
+                    switch message.content {
+                    case .text(let text):
+                        Text(LocalizedStringKey(text))
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(4)
+                    case .actionResult(let title, let duration, let deadline, let taskId):
+                        actionResultBubble(title: title, duration: duration, deadline: deadline, taskId: taskId)
+                    case .planProposal(let blocks):
+                        planProposalBubble(blocks: blocks)
+                    case .planModification(let actions):
+                        planModificationBubble(actions: actions)
+                    case .memorySaved(let fact):
+                        memoryBubble(fact: fact)
+                    case .question(let prompt, let options, _):
+                        questionBubble(prompt: prompt, options: options)
+                    }
+                }
+                .contextMenu {
+                    Button {
+                        UIPasteboard.general.string = message.text
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    Button(role: .destructive) {
+                        deleteMessage(withId: message.id)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
                 Spacer(minLength: 40)
             }
         }
+        .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
         .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: message.isUser ? .trailing : .leading)), removal: .opacity))
     }
     
@@ -415,8 +446,10 @@ struct AssistantView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.horizontal, 8)
+                    .padding(.leading, 24)
+                    .padding(.trailing, 16)
                 }
+                .padding(.horizontal, -16)
             }
         }
     }
@@ -505,6 +538,15 @@ struct AssistantView: View {
     }
     
     // MARK: - Actions
+    
+    private func deleteMessage(withId id: UUID) {
+        guard let session = appState?.activeChatSession else { return }
+        if let wnMessage = session.messages.first(where: { $0.id == id }) {
+            appState?.modelContext.delete(wnMessage)
+            try? appState?.modelContext.save()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+    }
     
     private func appendMessage(_ message: ChatMessage) {
         guard let session = appState?.activeChatSession else { return }
