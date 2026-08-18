@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 /// The Settings screen accessible from the Home toolbar.
 struct SettingsView: View {
@@ -383,6 +384,9 @@ struct AIConfigurationView: View {
 struct MemorySettingsView: View {
     @Environment(\.appState) private var appState
     
+    @State private var editingMemory: WNMemory?
+    @State private var editedContent: String = ""
+    
     var body: some View {
         List {
             if let appState = appState {
@@ -406,11 +410,17 @@ struct MemorySettingsView: View {
                                         
                                         Spacer()
                                         
+                                        
                                         Toggle("", isOn: Binding(
                                             get: { memory.isEnabled },
                                             set: { _ in appState.memoryService.toggleMemory(memory) }
                                         ))
                                         .labelsHidden()
+                                    }
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        editedContent = memory.content
+                                        editingMemory = memory
                                     }
                                 }
                                 .onDelete { indexSet in
@@ -431,5 +441,30 @@ struct MemorySettingsView: View {
             }
         }
         .navigationTitle("Memory")
+        .sheet(item: $editingMemory) { memory in
+            NavigationStack {
+                Form {
+                    Section("Memory Content") {
+                        TextEditor(text: $editedContent)
+                            .frame(minHeight: 100)
+                    }
+                }
+                .navigationTitle("Edit Memory")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { editingMemory = nil }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            memory.content = editedContent
+                            try? appState?.modelContext.save()
+                            editingMemory = nil
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
     }
 }

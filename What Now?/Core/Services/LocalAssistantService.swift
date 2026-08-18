@@ -168,6 +168,49 @@ final class LocalAssistantService: AIServiceProtocol {
         var newTimeResolved = timeResolved
         var newDurationResolved = durationResolved
         
+        // --- Correction Engine ---
+        let isCorrection = lower.hasPrefix("actually ") || lower.hasPrefix("change ") || lower.hasPrefix("make that ") || lower.hasPrefix("no ")
+        if isCorrection {
+            let stripped = lower.replacingOccurrences(of: "actually ", with: "")
+                                .replacingOccurrences(of: "change that to ", with: "")
+                                .replacingOccurrences(of: "make that ", with: "")
+                                .replacingOccurrences(of: "no ", with: "")
+            
+            let parsed = NaturalLanguageTaskParser.parse(stripped)
+            var corrected = false
+            
+            if let d = parseDateOption(stripped) ?? parsed.deadline {
+                newDate = d
+                newDateResolved = true
+                corrected = true
+            }
+            if let t = parseTimeOption(stripped) ?? parsed.preferredTime {
+                newTime = t
+                newTimeResolved = true
+                corrected = true
+            }
+            if let dur = parseDurationOption(stripped) ?? parsed.estimatedMinutes {
+                newDuration = dur
+                newDurationResolved = true
+                corrected = true
+            }
+            
+            if corrected {
+                state = .creatingTask(
+                    title: title,
+                    date: newDate,
+                    time: newTime,
+                    duration: newDuration,
+                    priority: newPriority,
+                    dateResolved: newDateResolved,
+                    timeResolved: newTimeResolved,
+                    durationResolved: newDurationResolved
+                )
+                return advanceStateMachine()
+            }
+        }
+        // --- End Correction Engine ---
+        
         if !dateResolved {
             if let d = parseDateOption(lower) {
                 newDate = d

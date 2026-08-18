@@ -16,6 +16,11 @@ struct AssistantView: View {
     
     @State private var showHistory: Bool = false
     @State private var voiceInput = VoiceInputService()
+    
+    @State private var showingDatePicker = false
+    @State private var selectedDate = Date()
+    @State private var showingTimePicker = false
+    @State private var selectedTime = Date()
 
     var body: some View {
         NavigationStack {
@@ -95,6 +100,47 @@ struct AssistantView: View {
             }
             .sheet(isPresented: $showHistory) {
                 AssistantHistoryView()
+            }
+            .sheet(isPresented: $showingDatePicker) {
+                NavigationStack {
+                    DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .padding()
+                        .navigationTitle("Choose Date")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingDatePicker = false } }
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") {
+                                    showingDatePicker = false
+                                    query = selectedDate.formatted(date: .abbreviated, time: .omitted)
+                                    submitQuery()
+                                }
+                            }
+                        }
+                }
+                .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showingTimePicker) {
+                NavigationStack {
+                    DatePicker("Time", selection: $selectedTime, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                        .padding()
+                        .navigationTitle("Choose Time")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingTimePicker = false } }
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") {
+                                    showingTimePicker = false
+                                    query = selectedTime.formatted(date: .omitted, time: .shortened)
+                                    submitQuery()
+                                }
+                            }
+                        }
+                }
+                .presentationDetents([.medium])
             }
         }
     }
@@ -418,7 +464,11 @@ struct AssistantView: View {
                         ForEach(options, id: \.self) { option in
                             Button {
                                 let rawOption = option.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: "")
-                                if rawOption == "Custom" || rawOption == "Choose Time" || rawOption == "Choose Date" {
+                                if rawOption == "Choose Date" {
+                                    showingDatePicker = true
+                                } else if rawOption == "Choose Time" {
+                                    showingTimePicker = true
+                                } else if rawOption == "Custom" {
                                     query = ""
                                     isFocused = true
                                 } else {
@@ -606,7 +656,7 @@ struct AssistantView: View {
             } catch {
                 print("Total routing failure: \(error)")
                 withAnimation {
-                    appendMessage(ChatMessage(isUser: false, content: .text("I'm currently offline and couldn't process that.")))
+                    appendMessage(ChatMessage(isUser: false, content: .text("I didn't quite catch that.")))
                     isProcessing = false
                 }
             }

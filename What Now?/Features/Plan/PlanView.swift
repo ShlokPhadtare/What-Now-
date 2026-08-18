@@ -20,7 +20,7 @@ struct PlanView: View {
     ) private var pendingTasks: [WNTask]
 
     var body: some View {
-        ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: WNTheme.Spacing.lg) {
                 // Native Date Picker Header
                 HStack {
@@ -53,30 +53,51 @@ struct PlanView: View {
                 }
                 .padding(.vertical, WNTheme.Spacing.xs)
 
-                if let dailyPlan, !dailyPlan.blocks.isEmpty {
-                    timeline(for: dailyPlan)
-                } else if pendingTasks.isEmpty {
-                    ContentUnavailableView(
-                        "No Plan Yet",
-                        systemImage: "calendar",
-                        description: Text("Add tasks to start planning your day.")
-                    )
-                    .padding(.top, WNTheme.Spacing.xxl)
-                } else {
-                    VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
-                        Text("Create a realistic timeline from your tasks and routines.")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-
-                        Button("Plan My Day", action: generatePlan)
-                            .buttonStyle(.borderedProminent)
-                            .buttonBorderShape(.capsule)
-                    }
-                    .padding(.top, WNTheme.Spacing.md)
-                }
             }
             .padding(.horizontal, WNTheme.Spacing.lg)
             .padding(.top, WNTheme.Spacing.sm)
+            .padding(.bottom, WNTheme.Spacing.md)
+
+            if let dailyPlan, !dailyPlan.blocks.isEmpty {
+                List {
+                    Text("TIMELINE")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+
+                    ForEach(dailyPlan.sortedBlocks) { block in
+                        BlockRow(block: block, appState: appState) {
+                            refreshPlan()
+                        }
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                    }
+                }
+                .listStyle(.plain)
+                .scrollIndicators(.hidden)
+            } else if pendingTasks.isEmpty {
+                ContentUnavailableView(
+                    "No Plan Yet",
+                    systemImage: "calendar",
+                    description: Text("Add tasks to start planning your day.")
+                )
+                .padding(.top, WNTheme.Spacing.xxl)
+                Spacer()
+            } else {
+                VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
+                    Text("Create a realistic timeline from your tasks and routines.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+
+                    Button("Plan My Day", action: generatePlan)
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.capsule)
+                }
+                .padding(.top, WNTheme.Spacing.md)
+                .padding(.horizontal, WNTheme.Spacing.lg)
+                Spacer()
+            }
         }
         .navigationTitle("Plan")
         .toolbar {
@@ -115,28 +136,7 @@ struct PlanView: View {
     }
 
     // MARK: - Timeline
-
-    @ViewBuilder
-    private func timeline(for plan: WNDailyPlan) -> some View {
-        VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
-            Text("TIMELINE")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(plan.sortedBlocks) { block in
-                    BlockRow(block: block, appState: appState) {
-                        refreshPlan()
-                    }
-
-                    if block.id != plan.sortedBlocks.last?.id {
-                        Divider()
-                            .padding(.leading, 76)
-                    }
-                }
-            }
-        }
-    }
+    // The timeline is now embedded directly in the body using a List.
 }
 
 // MARK: - Block Row
@@ -186,6 +186,39 @@ struct BlockRow: View {
             if let task = block.linkedTask,
                task.statusEnum == .pending || task.statusEnum == .inProgress {
                 showActions = true
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if let task = block.linkedTask, task.statusEnum != .completed {
+                Button {
+                    appState?.startFocus(for: task)
+                } label: {
+                    Label("Start", systemImage: "play.fill")
+                }
+                .tint(Color.accentColor)
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if let task = block.linkedTask, task.statusEnum != .completed {
+                Button {
+                    withAnimation {
+                        appState?.completeTask(task)
+                        refreshAction()
+                    }
+                } label: {
+                    Label("Complete", systemImage: "checkmark")
+                }
+                .tint(.green)
+                
+                Button {
+                    withAnimation {
+                        appState?.postponeTask(task)
+                        refreshAction()
+                    }
+                } label: {
+                    Label("Postpone", systemImage: "arrow.right.circle")
+                }
+                .tint(.orange)
             }
         }
         .confirmationDialog(block.title, isPresented: $showActions, titleVisibility: .visible) {

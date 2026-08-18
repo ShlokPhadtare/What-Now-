@@ -9,6 +9,8 @@ import SwiftData
 /// Dedicated view for managing the active Focus session.
 struct FocusView: View {
     @Environment(\.appState) private var appState
+    @State private var showingExitConfirmation = false
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationStack {
@@ -20,7 +22,29 @@ struct FocusView: View {
                 }
             }
             .navigationTitle("Focus")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        if appState?.activeFocusSession != nil {
+                            showingExitConfirmation = true
+                        } else {
+                            dismiss()
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.title3)
+                    }
+                }
+            }
+            .confirmationDialog("Leave this focus session?", isPresented: $showingExitConfirmation, titleVisibility: .visible) {
+                Button("Leave", role: .destructive) {
+                    appState?.pauseActiveFocusSession()
+                    dismiss()
+                }
+                Button("Keep Working", role: .cancel) { }
+            }
         }
     }
     

@@ -16,23 +16,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: WNTheme.Spacing.xxl) {
                 if let viewModel {
                     // Context / Status line under large navigation title
-                    if !viewModel.contextSubtitle.isEmpty {
-                        HStack(spacing: 8) {
-                            Text(viewModel.contextSubtitle)
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                            
-                            if let streak = appState?.streakService.currentStreak, streak > 1 {
-                                Text("\(streak) day streak")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(Color.orange)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.orange.opacity(0.15), in: Capsule())
-                            }
-                        }
-                        .padding(.top, 4)
-                    }
+                    // Minimal header spacing
 
                     if let activeSession = appState?.activeFocusSession {
                         activeFocusSection(activeSession, remainingTime: appState?.focusService.remainingTime ?? 0)
@@ -108,37 +92,6 @@ struct HomeView: View {
             Text("Enjoy the rest of your \(timeString).")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: WNTheme.Spacing.md) {
-                Button {
-                    appState?.selectedTab = .assistant
-                } label: {
-                    HStack {
-                        Text("Plan tomorrow")
-                        Spacer()
-                        Image(systemName: "arrow.right")
-                    }
-                    .font(.headline)
-                    .padding()
-                    .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .foregroundStyle(Color.accentColor)
-                }
-                
-                Button(action: {
-                    appState?.presentNewTaskEditor()
-                }) {
-                    HStack {
-                        Text("Add a task")
-                        Spacer()
-                        Image(systemName: "plus")
-                    }
-                    .font(.headline)
-                    .padding()
-                    .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .foregroundStyle(.primary)
-                }
-            }
-            .padding(.top, WNTheme.Spacing.lg)
         }
         .padding(.top, WNTheme.Spacing.md)
     }
@@ -147,7 +100,7 @@ struct HomeView: View {
     private func nextMoveSection(_ task: WNTask, viewModel: HomeViewModel) -> some View {
         VStack(alignment: .leading, spacing: WNTheme.Spacing.lg) {
             
-            Text("NEXT")
+            Text(viewModel.contextSubtitle.isEmpty ? "NEXT" : viewModel.contextSubtitle.uppercased())
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.secondary)
             
@@ -192,15 +145,6 @@ struct HomeView: View {
                     .padding()
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .foregroundStyle(.white)
-                }
-
-                Button {
-                    appState?.selectedTab = .plan
-                } label: {
-                    Text("See today's plan")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
                 }
             }
             .padding(.top, WNTheme.Spacing.md)
