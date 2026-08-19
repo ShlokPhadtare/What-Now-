@@ -45,9 +45,9 @@ struct AssistantView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.top, WNTheme.Spacing.md)
-                            .padding(.bottom, 120)
                             .frame(maxWidth: .infinity)
                         }
+                        .defaultScrollAnchor(.bottom)
                         .onChange(of: appState?.activeChatSession?.messages.count ?? 0) { _, _ in
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                 if let last = appState?.activeChatSession?.messages.max(by: { $0.timestamp < $1.timestamp }) {
@@ -66,9 +66,10 @@ struct AssistantView: View {
                         isFocused = false
                     }
                 }
-                
+            }
+            .safeAreaInset(edge: .bottom) {
                 inputArea
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 8)
             }
             .navigationTitle(appState?.activeChatSession?.title ?? "What Now?")
             .navigationBarTitleDisplayMode(.inline)
@@ -582,7 +583,9 @@ struct AssistantView: View {
     
     private func deleteMessage(withId id: UUID) {
         guard let session = appState?.activeChatSession else { return }
-        if let wnMessage = session.messages.first(where: { $0.id == id }) {
+        if let index = session.messages.firstIndex(where: { $0.id == id }) {
+            let wnMessage = session.messages[index]
+            session.messages.remove(at: index)
             appState?.modelContext.delete(wnMessage)
             try? appState?.modelContext.save()
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
