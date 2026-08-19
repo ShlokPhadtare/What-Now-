@@ -76,9 +76,11 @@ final class IntelligenceRouter: AIServiceProtocol {
             return try await localAssistantService.processQuery(query, history: history, context: context)
         }
         
-        // 2. Attempt Deterministic Local Assistant FIRST for explicit action commands
-        if let localIntent = try? await localAssistantService.processQuery(query, history: history, context: context) {
-            return localIntent
+        // 2. Handle explicit cancel at any point.
+        if lowerQuery == "cancel" || lowerQuery == "stop" || lowerQuery == "nevermind" || lowerQuery == "× cancel" {
+            if let localIntent = try? await localAssistantService.processQuery(query, history: history, context: context) {
+                return localIntent
+            }
         }
         
         // 3. Try External AI (Level 3) for natural conversation and complex planning

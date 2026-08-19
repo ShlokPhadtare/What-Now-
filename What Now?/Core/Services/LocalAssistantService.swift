@@ -140,6 +140,31 @@ final class LocalAssistantService: AIServiceProtocol {
             let fragment = String(query.dropFirst("focus on ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
             return .startFocus(taskTitleFragment: fragment)
         }
+        // Move/Change command
+        if lower.hasPrefix("move ") || lower.hasPrefix("change ") {
+            let components = lower.components(separatedBy: " to ")
+            if components.count == 2 {
+                let taskFragment = String(components[0].dropFirst(lower.hasPrefix("move ") ? 5 : 7)).trimmingCharacters(in: .whitespacesAndNewlines)
+                let timeFragment = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                let pattern = #"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#
+                if let regex = try? NSRegularExpression(pattern: pattern),
+                   let match = regex.firstMatch(in: timeFragment, range: NSRange(timeFragment.startIndex..., in: timeFragment)) {
+                    
+                    var hour = Int(timeFragment[Range(match.range(at: 1), in: timeFragment)!]) ?? 0
+                    if let modRange = Range(match.range(at: 3), in: timeFragment) {
+                        let modifier = String(timeFragment[modRange])
+                        if modifier == "pm" && hour < 12 { hour += 12 }
+                        else if modifier == "am" && hour == 12 { hour = 0 }
+                    } else if hour < 6 { hour += 12 }
+                    
+                    if let newStart = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: .now) {
+                        let iso = ISO8601DateFormatter().string(from: newStart)
+                        return .modifyPlan(actions: [PlanModification(originalTitleFragment: taskFragment, newStartTimeIso: iso, newDurationMinutes: nil)])
+                    }
+                }
+            }
+        }
         
         // What's next / recommendations
         if lower.contains("what's next") || lower.contains("recommend") || lower.contains("what should i do") || lower.contains("what now") {
@@ -158,11 +183,13 @@ final class LocalAssistantService: AIServiceProtocol {
             }
         }
         
-        // Attempt a general task parse if nothing else matches
-        return processNewTaskCommand(query: query)
+        // Attempt generic task creation as a final fallback ("Gym at 6", "Study for an hour")
+        let taskIntent = processNewTaskCommand(query: query)
+        if case .chatResponse(let msg) = taskIntent, msg == "I didn't quite catch what you wanted to add. What should I call it?" {
+            throw NSError(domain: "LocalAssistant", code: 404, userInfo: [NSLocalizedDescriptionKey: "Unrecognized offline intent."])
+        }
+        return taskIntent
     }
-    
-    // MARK: - State Machine Handlers
     
     private func processNewTaskCommand(query: String) -> AIAssistantIntent {
         let parsed = NaturalLanguageTaskParser.parse(query)
