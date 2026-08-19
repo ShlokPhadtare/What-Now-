@@ -83,7 +83,7 @@ Start a task and enter a dedicated, calm focus environment. A contained circular
 | Name | Role |
 |---|---|
 | Shlok Phadtare | Creator, product design, iOS development |
-| Google Gemini (Antigravity) | AI pair programmer — architecture, intelligence layer, interaction design |
+| Google (Antigravity) | AI pair programmer — architecture, intelligence layer, interaction design |
 | OpenAI ChatGPT | AI pair programmer — early product specification and UI direction |
 
 ---
