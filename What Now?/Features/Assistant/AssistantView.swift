@@ -155,18 +155,8 @@ struct AssistantView: View {
             VStack(spacing: WNTheme.Spacing.lg) {
                 VStack(spacing: WNTheme.Spacing.sm) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 32, weight: .light))
-                        .foregroundStyle(Color.accentColor)
-                    
-                    Text("Ask What Now?")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    
-                    Text("Plan your day, manage tasks, or figure out what to do next.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, WNTheme.Spacing.xl)
+                        .font(.system(size: 24, weight: .regular))
+                        .foregroundStyle(Color.accentColor.opacity(0.8))
                 }
                 
                 VStack(spacing: WNTheme.Spacing.sm) {
