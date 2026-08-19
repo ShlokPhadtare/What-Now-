@@ -23,8 +23,9 @@ struct FocusView: View {
             }
             .navigationTitle("Focus")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
                         if appState?.activeFocusSession != nil {
                             showingExitConfirmation = true
@@ -32,9 +33,10 @@ struct FocusView: View {
                             dismiss()
                         }
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                            .font(.title3)
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Back")
+                        }
                     }
                 }
             }
@@ -47,6 +49,8 @@ struct FocusView: View {
             }
         }
     }
+    
+    @State private var breathingScale: CGFloat = 1.0
     
     @ViewBuilder
     private func activeSessionContent(_ session: WNFocusSession) -> some View {
@@ -62,6 +66,7 @@ struct FocusView: View {
                 .font(.system(size: 32, weight: .bold))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
+                .padding(.bottom, WNTheme.Spacing.xxl)
             
             ZStack {
                 Circle()
@@ -71,6 +76,8 @@ struct FocusView: View {
                     .stroke(isPaused ? Color.secondary : Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 1), value: progress)
+                    .scaleEffect(isPaused ? 1.0 : breathingScale)
+                    .animation(isPaused ? .spring(response: 0.3) : .easeInOut(duration: 2).repeatForever(autoreverses: true), value: isPaused ? 1.0 : breathingScale)
                 
                 VStack {
                     Text(remainingTime.formattedDuration)
@@ -91,6 +98,7 @@ struct FocusView: View {
             
             HStack(spacing: WNTheme.Spacing.xl) {
                 Button(action: {
+                    HapticManager.shared.playRigid()
                     withAnimation {
                         if isPaused {
                             appState?.resumeActiveFocusSession()
@@ -111,10 +119,12 @@ struct FocusView: View {
                 }
                 
                 Button(action: {
+                    HapticManager.shared.playSuccess()
                     withAnimation {
                         if let task = session.task {
                             appState?.completeTask(task)
                         }
+                        dismiss()
                     }
                 }) {
                     Text("Complete")
@@ -127,6 +137,18 @@ struct FocusView: View {
             }
             
             Spacer()
+        }
+        .onAppear {
+            if !appState!.isFocusPaused {
+                breathingScale = 1.02
+            }
+        }
+        .onChange(of: appState?.isFocusPaused ?? false) { _, paused in
+            if paused {
+                breathingScale = 1.0
+            } else {
+                breathingScale = 1.02
+            }
         }
     }
     

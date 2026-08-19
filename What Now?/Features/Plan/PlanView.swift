@@ -191,6 +191,7 @@ struct BlockRow: View {
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             if let task = block.linkedTask, task.statusEnum != .completed {
                 Button {
+                    HapticManager.shared.playSoft()
                     appState?.startFocus(for: task)
                 } label: {
                     Label("Start", systemImage: "play.fill")
@@ -202,6 +203,7 @@ struct BlockRow: View {
             if let task = block.linkedTask, task.statusEnum != .completed {
                 Button {
                     withAnimation {
+                        HapticManager.shared.playSuccess()
                         appState?.completeTask(task)
                         refreshAction()
                     }
@@ -212,6 +214,7 @@ struct BlockRow: View {
                 
                 Button {
                     withAnimation {
+                        HapticManager.shared.playRigid()
                         appState?.postponeTask(task)
                         refreshAction()
                     }

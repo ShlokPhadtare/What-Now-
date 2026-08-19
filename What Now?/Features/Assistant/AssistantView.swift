@@ -73,7 +73,7 @@ struct AssistantView: View {
             .navigationTitle(appState?.activeChatSession?.title ?? "What Now?")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
                         showHistory = true
                     } label: {
@@ -463,6 +463,7 @@ struct AssistantView: View {
                     HStack(spacing: 8) {
                         ForEach(options, id: \.self) { option in
                             Button {
+                                HapticManager.shared.playSelection()
                                 let rawOption = option.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: "")
                                 if rawOption == "Choose Date" {
                                     showingDatePicker = true

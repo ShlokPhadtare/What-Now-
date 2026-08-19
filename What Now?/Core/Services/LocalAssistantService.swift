@@ -75,6 +75,46 @@ final class LocalAssistantService: AIServiceProtocol {
             return processNewTaskCommand(query: text)
         }
         
+        // 3. Replan command
+        if lower.contains("replan") || lower.contains("plan my day") || lower.contains("plan my evening") || lower.contains("plan my morning") {
+            return .planDay
+        }
+        
+        // 4. Start command
+        if lower.hasPrefix("start ") || lower.hasPrefix("begin ") {
+            let prefix = lower.hasPrefix("start ") ? "start " : "begin "
+            let fragment = String(query.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            return .startFocus(taskTitleFragment: fragment)
+        }
+        
+        // 5. Move/Change command
+        if lower.hasPrefix("move ") || lower.hasPrefix("change ") {
+            // Very naive local modification extraction: "move [task] to [time]"
+            let components = lower.components(separatedBy: " to ")
+            if components.count == 2 {
+                let taskFragment = String(components[0].dropFirst(lower.hasPrefix("move ") ? 5 : 7)).trimmingCharacters(in: .whitespacesAndNewlines)
+                let timeFragment = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Parse specific hour
+                let pattern = #"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#
+                if let regex = try? NSRegularExpression(pattern: pattern),
+                   let match = regex.firstMatch(in: timeFragment, range: NSRange(timeFragment.startIndex..., in: timeFragment)) {
+                    
+                    var hour = Int(timeFragment[Range(match.range(at: 1), in: timeFragment)!]) ?? 0
+                    if let modRange = Range(match.range(at: 3), in: timeFragment) {
+                        let modifier = String(timeFragment[modRange])
+                        if modifier == "pm" && hour < 12 { hour += 12 }
+                        else if modifier == "am" && hour == 12 { hour = 0 }
+                    } else if hour < 6 { hour += 12 }
+                    
+                    if let newStart = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: .now) {
+                        let iso = ISO8601DateFormatter().string(from: newStart)
+                        return .modifyPlan(actions: [PlanModification(originalTitleFragment: taskFragment, newStartTimeIso: iso, newDurationMinutes: nil)])
+                    }
+                }
+            }
+        }
+        
         // Return error to let the IntelligenceRouter fall back to External AI
         throw NSError(domain: "LocalAssistant", code: 404, userInfo: [NSLocalizedDescriptionKey: "Not a deterministic local command."])
     }

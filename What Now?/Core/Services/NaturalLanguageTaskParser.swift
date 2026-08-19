@@ -121,10 +121,16 @@ enum NaturalLanguageTaskParser {
     }
 
     private static func cleanedTitle(from value: String) -> String {
-        let markers = [" every ", " weekdays", " weekends", " tomorrow", " today", " weekly", " monthly", " monday", " tuesday", " wednesday", " thursday", " friday", " saturday", " sunday", " for ", " at "]
+        let markers = [
+            " every ", " weekdays", " weekends", " tomorrow", " today", " tonight",
+            " this morning", " this afternoon", " this evening", " next week",
+            " weekly", " monthly", " monday", " tuesday", " wednesday", " thursday",
+            " friday", " saturday", " sunday", " for ", " at ", " in ", " on "
+        ]
         let prefixes = [
-            "add ", "create ", "schedule ", "remind me to ", "task ",
-            "i need to ", "i want to ", "i have to ", "please ", "can you ", "could you "
+            "add ", "create ", "schedule ", "remind me to ", "remind me about ", "task ",
+            "i need to ", "i want to ", "i have to ", "please ", "can you ", "could you ",
+            "help me "
         ]
         
         var lower = value.lowercased()
