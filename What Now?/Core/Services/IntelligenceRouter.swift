@@ -86,11 +86,11 @@ final class IntelligenceRouter: AIServiceProtocol {
         // 3. Try External AI (Level 3) for natural conversation and complex planning
         do {
             let intent = try await externalService.processQuery(query, history: history, context: context)
-            await updateProviderStatus(.connected)
+            updateProviderStatus(.connected)
             return intent
         } catch {
             print("External AI failed: \(error), falling back to local assistant...")
-            await updateProviderStatus(.unavailable)
+            updateProviderStatus(.unavailable)
         }
         
         // 4. Fallback: Deterministic Local Assistant (Level 1)
@@ -108,7 +108,7 @@ final class IntelligenceRouter: AIServiceProtocol {
         case .openAI:
             let key = preferenceService.getAPIKey(for: .openAI) ?? ""
             let status: ProviderConnectionStatus = key.isEmpty ? .unavailable : .unknown
-            await updateProviderStatus(status)
+            updateProviderStatus(status)
             return status
             
         case .lmStudio:
@@ -116,7 +116,7 @@ final class IntelligenceRouter: AIServiceProtocol {
             if baseUrlString.hasSuffix("/") { baseUrlString.removeLast() }
             if baseUrlString.hasSuffix("/v1") { baseUrlString = String(baseUrlString.dropLast(3)) }
             guard let url = URL(string: baseUrlString + "/v1/models") else {
-                await updateProviderStatus(.unavailable)
+                updateProviderStatus(.unavailable)
                 return .unavailable
             }
             
@@ -127,14 +127,14 @@ final class IntelligenceRouter: AIServiceProtocol {
             do {
                 let (_, response) = try await URLSession.shared.data(for: request)
                 if let http = response as? HTTPURLResponse, http.statusCode == 200 {
-                    await updateProviderStatus(.connected)
+                    updateProviderStatus(.connected)
                     return .connected
                 } else {
-                    await updateProviderStatus(.unavailable)
+                    updateProviderStatus(.unavailable)
                     return .unavailable
                 }
             } catch {
-                await updateProviderStatus(.unavailable)
+                updateProviderStatus(.unavailable)
                 return .unavailable
             }
         }

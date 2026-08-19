@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum MessageContent: Codable, Equatable {
+enum MessageContent: Codable, Equatable, Sendable {
     case text(String)
     case actionResult(title: String, duration: Int?, deadline: Date?, taskId: String?)
     case planProposal(blocks: [ProposedBlock])
@@ -14,7 +14,7 @@ enum MessageContent: Codable, Equatable {
     case question(prompt: String, options: [String], expectedField: String)
 }
 
-struct ChatMessage: Identifiable, Codable, Equatable {
+struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
     var id = UUID()
     let isUser: Bool
     let content: MessageContent

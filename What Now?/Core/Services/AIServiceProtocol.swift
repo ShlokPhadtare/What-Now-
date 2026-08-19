@@ -18,13 +18,13 @@ enum AIAssistantIntent {
     case askQuestion(prompt: String, options: [String], expectedField: String)
 }
 
-struct ProposedBlock: Codable, Equatable {
+struct ProposedBlock: Codable, Equatable, Sendable {
     let title: String
     let startTimeIso: String // e.g. "2023-10-31T18:00:00Z"
     let durationMinutes: Int
 }
 
-struct PlanModification: Codable, Equatable {
+struct PlanModification: Codable, Equatable, Sendable {
     let originalTitleFragment: String
     let newStartTimeIso: String?
     let newDurationMinutes: Int?

@@ -34,6 +34,7 @@ final class WNChatMessage {
     var session: WNChatSession?
     
     @Transient
+    @MainActor
     var content: MessageContent {
         get {
             if let decoded = try? JSONDecoder().decode(MessageContent.self, from: contentData) {
@@ -49,10 +50,12 @@ final class WNChatMessage {
     }
     
     @Transient
+    @MainActor
     var chatMessage: ChatMessage {
         ChatMessage(id: id, isUser: isUser, content: content, timestamp: timestamp)
     }
     
+    @MainActor
     init(isUser: Bool, content: MessageContent) {
         self.id = UUID()
         self.isUser = isUser
