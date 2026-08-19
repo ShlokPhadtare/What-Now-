@@ -171,7 +171,15 @@ final class LocalAssistantService: AIServiceProtocol {
         }
         
         let dateResolved = parsed.deadline != nil
-        let timeResolved = parsed.preferredTime != nil
+        
+        var timeResolved = parsed.preferredTime != nil
+        if let deadline = parsed.deadline {
+            let components = Calendar.current.dateComponents([.hour, .minute], from: deadline)
+            if (components.hour ?? 0) != 0 || (components.minute ?? 0) != 0 {
+                timeResolved = true
+            }
+        }
+        
         let durationResolved = parsed.estimatedMinutes != nil
         
         state = .creatingTask(
