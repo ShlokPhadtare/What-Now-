@@ -78,7 +78,7 @@ Start a task and enter a dedicated, calm focus environment. A contained circular
 
 ---
 
-## 🙏 Contributors
+## Contributors
 
 | Name | Role |
 |---|---|
