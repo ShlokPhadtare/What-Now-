@@ -40,31 +40,31 @@ struct MainTabView: View {
     var body: some View {
         if let appState = appState {
             TabView(selection: Bindable(appState).selectedTab) {
-            Tab("Home", systemImage: "house", value: .home) {
-                NavigationStack {
-                    HomeView()
+                Tab("Home", systemImage: "house", value: .home) {
+                    NavigationStack {
+                        HomeView()
+                    }
+                }
+
+                Tab("Plan", systemImage: "calendar", value: .plan) {
+                    NavigationStack {
+                        PlanView()
+                    }
+                }
+
+                Tab("Tasks", systemImage: "checklist", value: .tasks) {
+                    NavigationStack {
+                        TaskListView()
+                    }
+                }
+
+                Tab("AI", systemImage: "sparkles", value: .assistant) {
+                    AssistantView()
                 }
             }
-
-            Tab("Plan", systemImage: "calendar", value: .plan) {
-                NavigationStack {
-                    PlanView()
-                }
+            .fullScreenCover(item: Bindable(appState).activeFocusSession) { session in
+                FocusView()
             }
-
-            Tab("Tasks", systemImage: "checklist", value: .tasks) {
-                NavigationStack {
-                    TaskListView()
-                }
-            }
-
-            Tab("AI", systemImage: "sparkles", value: .assistant) {
-                AssistantView()
-            }
-        }
-        .fullScreenCover(item: Bindable(appState).activeFocusSession) { session in
-            FocusView()
-        }
         }
     }
 }

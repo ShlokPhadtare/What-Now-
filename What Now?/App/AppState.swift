@@ -24,6 +24,7 @@ final class AppState {
     let planService: PlanService
     let memoryService: MemoryService
     let streakService: StreakService
+    let patternRecognitionService: PatternRecognitionService
     
     // AI Services
     let intelligenceRouter: IntelligenceRouter
@@ -63,6 +64,7 @@ final class AppState {
         let prefService = PreferenceService(context: modelContext)
         self.preferenceService = prefService
         self.planService = PlanService(context: modelContext, taskService: taskService, preferenceService: prefService)
+        self.patternRecognitionService = PatternRecognitionService(context: modelContext, memoryService: memoryService)
         
         self.intelligenceRouter = IntelligenceRouter(
             preferenceService: prefService,
@@ -79,6 +81,11 @@ final class AppState {
         
         // Request notification permissions on first launch
         NotificationManager.shared.requestAuthorization()
+        
+        // Analyze patterns in the background
+        Task { @MainActor in
+            self.patternRecognitionService.analyzeAndGenerateMemories()
+        }
     }
 
     // MARK: - Convenience

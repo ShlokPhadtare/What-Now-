@@ -7,6 +7,7 @@ import Foundation
 
 enum LocalConversationState: Equatable {
     case idle
+    case onboarding(step: OnboardingStep)
     case creatingTask(
         title: String,
         date: Date?,
@@ -17,6 +18,12 @@ enum LocalConversationState: Equatable {
         timeResolved: Bool,
         durationResolved: Bool
     )
+    
+    enum OnboardingStep: Equatable {
+        case askName
+        case askEnergy
+        case askDuration
+    }
 }
 
 final class LocalAssistantService: AIServiceProtocol {
@@ -42,6 +49,10 @@ final class LocalAssistantService: AIServiceProtocol {
         // Can be used to explicitly clear state if needed.
     }
     
+    func startOnboarding() {
+        state = .onboarding(step: .askName)
+    }
+    
     func processQuery(_ query: String, history: [AIChatMessage], context: String) async throws -> AIAssistantIntent {
         let lower = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -52,6 +63,11 @@ final class LocalAssistantService: AIServiceProtocol {
                 state = .idle
                 return .chatResponse(message: "Okay, cancelled.")
             }
+        }
+        
+        // 0. Handle Onboarding
+        if case .onboarding(let step) = state {
+            return processOnboardingState(query: text, lower: lower, step: step)
         }
         
         // 1. Check if we are in the middle of a task creation flow
@@ -77,7 +93,7 @@ final class LocalAssistantService: AIServiceProtocol {
         
         // 3. Replan command
         if lower.contains("replan") || lower.contains("plan my day") || lower.contains("plan my evening") || lower.contains("plan my morning") {
-            return .planDay
+            return .planDay(date: .now)
         }
         
         // 4. Start command
@@ -122,9 +138,46 @@ final class LocalAssistantService: AIServiceProtocol {
     func processFallback(query: String) async throws -> AIAssistantIntent {
         let lower = query.lowercased()
         
-        // Replan
+        // Replan / Plan
         if lower.contains("replan") || lower.contains("plan my day") || lower.contains("plan my evening") || lower.contains("plan my morning") {
-            return .planDay
+            return .planDay(date: .now)
+        }
+        if lower.contains("plan tomorrow") {
+            return .planDay(date: Calendar.current.date(byAdding: .day, value: 1, to: .now))
+        }
+        
+        // Complete command
+        if lower.hasPrefix("complete ") || lower.hasPrefix("finish ") || lower.hasPrefix("i finished ") {
+            let fragment = lower
+                .replacingOccurrences(of: "complete ", with: "")
+                .replacingOccurrences(of: "finish ", with: "")
+                .replacingOccurrences(of: "i finished ", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return .completeTask(taskTitleFragment: fragment)
+        }
+        
+        // Delete command
+        if lower.hasPrefix("delete ") || lower.hasPrefix("remove ") {
+            let fragment = lower
+                .replacingOccurrences(of: "delete ", with: "")
+                .replacingOccurrences(of: "remove ", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return .deleteTask(taskTitleFragment: fragment)
+        }
+        
+        // Postpone command
+        if lower.hasPrefix("postpone ") || lower.hasPrefix("delay ") {
+            var fragment = lower
+                .replacingOccurrences(of: "postpone ", with: "")
+                .replacingOccurrences(of: "delay ", with: "")
+            
+            var targetDate: Date? = nil
+            if fragment.contains(" to tomorrow") {
+                targetDate = Calendar.current.date(byAdding: .day, value: 1, to: .now)
+                fragment = fragment.replacingOccurrences(of: " to tomorrow", with: "")
+            }
+            
+            return .postponeTask(taskTitleFragment: fragment.trimmingCharacters(in: .whitespacesAndNewlines), toDate: targetDate)
         }
         
         // Start focus
@@ -221,6 +274,40 @@ final class LocalAssistantService: AIServiceProtocol {
         )
         
         return advanceStateMachine()
+    }
+    
+    // MARK: - State Machine Handlers
+    
+    private func processOnboardingState(query: String, lower: String, step: LocalConversationState.OnboardingStep) -> AIAssistantIntent {
+        switch step {
+        case .askName:
+            let name = query.trimmingCharacters(in: .punctuationCharacters)
+            preferenceService.completeOnboarding(name: name, peakEnergy: .morning, focusMinutes: 25)
+            state = .onboarding(step: .askEnergy)
+            return .chatResponse(message: "Nice to meet you, \(name)! Are you generally more productive in the morning, afternoon, or evening?")
+            
+        case .askEnergy:
+            var energy: TimeOfDay = .morning
+            if lower.contains("afternoon") { energy = .afternoon }
+            else if lower.contains("evening") || lower.contains("night") { energy = .evening }
+            
+            preferenceService.updatePeakEnergy(energy)
+            state = .onboarding(step: .askDuration)
+            return .chatResponse(message: "Got it, \(energy.displayName.lowercased()). Last question: how long do you usually like to focus on a single task before taking a break? (e.g., 25, 45, 60 mins)")
+            
+        case .askDuration:
+            let duration = NaturalLanguageTaskParser.parseDuration(from: lower) ?? 25
+            preferenceService.updatePreferredFocusDuration(duration)
+            
+            // Generate basic memories
+            Task { @MainActor in
+                memoryService.addMemory(content: "Prefers to work in the \(preferenceService.profile.peakEnergyTimeEnum.displayName.lowercased())", category: .preferences, source: "Onboarding")
+                memoryService.addMemory(content: "Preferred focus duration is \(duration) minutes", category: .preferences, source: "Onboarding")
+            }
+            
+            state = .idle
+            return .chatResponse(message: "Awesome! I've saved those preferences to my memory. You can view or change them anytime in Settings. What would you like to plan today?")
+        }
     }
     
     private func processTaskCreationState(

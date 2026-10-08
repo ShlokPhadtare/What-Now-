@@ -60,6 +60,15 @@ class BaseOpenAIService: AIServiceProtocol {
         7. Action: Chat Response (Answer questions or clarify)
         {"intent": "chatResponse", "message": "Your helpful response here."}
         
+        8. Action: Complete Task
+        {"intent": "completeTask", "taskTitleFragment": "dsa"}
+        
+        9. Action: Delete Task
+        {"intent": "deleteTask", "taskTitleFragment": "dsa"}
+        
+        10. Action: Postpone Task
+        {"intent": "postponeTask", "taskTitleFragment": "dsa", "deadlineIso": "2023-11-01T12:00:00Z"}
+        
         Never include markdown backticks around the JSON. Return only the raw JSON string.
         """
         
@@ -118,7 +127,7 @@ class BaseOpenAIService: AIServiceProtocol {
             case "remember":
                 return .remember(fact: parsed.fact ?? "User preference")
             case "planDay": // Legacy fallback
-                return .planDay
+                return .planDay(date: nil)
             case "createTask":
                 var deadline: Date? = nil
                 if let iso = parsed.deadlineIso {
@@ -132,6 +141,17 @@ class BaseOpenAIService: AIServiceProtocol {
                 return .getRecommendations
             case "chatResponse":
                 return .chatResponse(message: parsed.message ?? "I'm not sure how to respond to that.")
+            case "completeTask":
+                return .completeTask(taskTitleFragment: parsed.taskTitleFragment ?? "")
+            case "deleteTask":
+                return .deleteTask(taskTitleFragment: parsed.taskTitleFragment ?? "")
+            case "postponeTask":
+                var targetDate: Date? = nil
+                if let iso = parsed.deadlineIso {
+                    let formatter = ISO8601DateFormatter()
+                    targetDate = formatter.date(from: iso)
+                }
+                return .postponeTask(taskTitleFragment: parsed.taskTitleFragment ?? "", toDate: targetDate)
             default:
                 return .chatResponse(message: jsonString)
             }

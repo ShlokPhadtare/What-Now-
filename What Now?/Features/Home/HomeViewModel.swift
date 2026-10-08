@@ -23,8 +23,11 @@ final class HomeViewModel {
     var dynamicPlanActionTitle: String = "Plan my day"
     var userName: String?
     var topRecommendation: WNTask?
+    var upcomingTasks: [WNTask] = []
     var pendingCount: Int = 0
     var overdueCount: Int = 0
+    var completedTodayCount: Int = 0
+    var todayPlan: WNDailyPlan?
     var categories: [WNCategory] = []
 
     // MARK: - Init
@@ -51,13 +54,20 @@ final class HomeViewModel {
         pendingCount = pending.count
         overdueCount = pending.filter(\.isOverdue).count
 
+        let completed = taskService.completedTasks()
+        completedTodayCount = completed.filter {
+            guard let completedAt = $0.completedAt else { return false }
+            return Calendar.current.isDateInToday(completedAt)
+        }.count
+
         let hour = Calendar.current.component(.hour, from: Date())
         
         // Plan action dynamic title
-        let todayPlan = planService.plan(for: .now)
+        let plan = planService.plan(for: .now)
+        todayPlan = plan
         if pendingCount == 0 {
             dynamicPlanActionTitle = "Plan tomorrow"
-        } else if todayPlan != nil {
+        } else if plan != nil {
             dynamicPlanActionTitle = "Adjust today's plan"
         } else if hour < 12 {
             dynamicPlanActionTitle = "Plan my day"
@@ -76,13 +86,20 @@ final class HomeViewModel {
                 contextSubtitle = "Your evening is clear."
             }
         } else if pendingCount == 1 {
-            contextSubtitle = "One thing left."
+            contextSubtitle = "One thing left to tackle."
         } else {
-            contextSubtitle = "You have \(pendingCount) things to work through."
+            contextSubtitle = "\(pendingCount) tasks queued for today."
         }
 
-        // Phase 1: Simple recommendation = first overdue, then highest priority, then earliest deadline
-        topRecommendation = computeSimpleRecommendation(from: pending)
+        // Recommendation
+        let top = computeSimpleRecommendation(from: pending)
+        topRecommendation = top
+
+        if let top {
+            upcomingTasks = Array(pending.filter { $0.id != top.id }.prefix(3))
+        } else {
+            upcomingTasks = Array(pending.prefix(3))
+        }
 
         // Categories that have at least one pending task
         let allCategories = categoryService.allCategories()

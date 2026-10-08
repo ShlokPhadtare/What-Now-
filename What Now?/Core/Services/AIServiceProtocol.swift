@@ -8,7 +8,7 @@ import Foundation
 /// Defines the intents the AI can return to operate the application.
 enum AIAssistantIntent {
     case chatResponse(message: String)
-    case planDay // Legacy
+    case planDay(date: Date? = nil) // Now supports target dates
     case proposePlan(blocks: [ProposedBlock])
     case modifyPlan(actions: [PlanModification])
     case remember(fact: String)
@@ -16,6 +16,11 @@ enum AIAssistantIntent {
     case startFocus(taskTitleFragment: String)
     case getRecommendations
     case askQuestion(prompt: String, options: [String], expectedField: String)
+    
+    // New Actions
+    case completeTask(taskTitleFragment: String)
+    case deleteTask(taskTitleFragment: String)
+    case postponeTask(taskTitleFragment: String, toDate: Date?)
 }
 
 struct ProposedBlock: Codable, Equatable, Sendable {

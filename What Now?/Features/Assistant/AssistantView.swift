@@ -92,6 +92,13 @@ struct AssistantView: View {
                     context.insert(session)
                     try? context.save()
                     appState?.activeChatSession = session
+                    if let pref = appState?.preferenceService, !pref.isOnboardingComplete {
+                        appState?.intelligenceRouter.localAssistantService.startOnboarding()
+                        let msg = ChatMessage(isUser: false, content: .text("Hi! I'm What Now? Before I start planning your days, tell me a little about yourself. What's your name?"))
+                        let wnMessage = WNChatMessage(isUser: false, content: msg.content)
+                        wnMessage.session = session
+                        session.messages.append(wnMessage)
+                    }
                 }
             }
             .onChange(of: voiceInput.recognizedText) { _, text in
@@ -468,12 +475,13 @@ struct AssistantView: View {
                                     submitQuery()
                                 }
                             } label: {
-                                Text(option)
-                                    .font(.subheadline.weight(.medium))
+                                let isHighlighted = option.hasPrefix("[") && option.hasSuffix("]")
+                                Text(option.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))
+                                    .font(.subheadline.weight(isHighlighted ? .bold : .medium))
                                     .padding(.vertical, 8)
                                     .padding(.horizontal, 16)
-                                    .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
-                                    .foregroundStyle(.primary)
+                                    .background(isHighlighted ? Color.accentColor : Color(uiColor: .tertiarySystemFill), in: Capsule())
+                                    .foregroundStyle(isHighlighted ? .white : .primary)
                             }
                         }
                         
@@ -689,11 +697,55 @@ struct AssistantView: View {
                 }
             }
             
-        case .planDay:
-            appState?.planService.replanRemainingDay(for: .now)
+        case .planDay(let date):
+            let targetDate = date ?? .now
+            appState?.planService.replanRemainingDay(for: targetDate)
             appState?.streakService.recordPlanCreated()
+            
+            let message = Calendar.current.isDateInToday(targetDate)
+                ? "I've planned your day. You can view the timeline in the Plan tab."
+                : "I've planned \(targetDate.formatted(date: .abbreviated, time: .omitted)). You can view the timeline in the Plan tab."
+                
             withAnimation {
-                appendMessage(ChatMessage(isUser: false, content: .text("I've planned your day. You can view the timeline in the Plan tab.")))
+                appendMessage(ChatMessage(isUser: false, content: .text(message)))
+            }
+            
+        case .completeTask(let fragment):
+            if let task = appState?.taskService.allTasks().first(where: { $0.title.localizedCaseInsensitiveContains(fragment) }) {
+                appState?.taskService.completeTask(task)
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text("I've marked '\(task.title)' as completed.")))
+                }
+            } else {
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text("I couldn't find a task matching '\(fragment)'.")))
+                }
+            }
+            
+        case .deleteTask(let fragment):
+            if let task = appState?.taskService.allTasks().first(where: { $0.title.localizedCaseInsensitiveContains(fragment) }) {
+                appState?.taskService.deleteTask(task)
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text("I've deleted '\(task.title)'.")))
+                }
+            } else {
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text("I couldn't find a task matching '\(fragment)'.")))
+                }
+            }
+            
+        case .postponeTask(let fragment, let toDate):
+            if let task = appState?.taskService.allTasks().first(where: { $0.title.localizedCaseInsensitiveContains(fragment) }) {
+                let target = toDate ?? Calendar.current.date(byAdding: .day, value: 1, to: .now)!
+                task.deadline = target
+                try? appState?.modelContext.save()
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text("I've postponed '\(task.title)' to \(target.formatted(date: .abbreviated, time: .omitted)).")))
+                }
+            } else {
+                withAnimation {
+                    appendMessage(ChatMessage(isUser: false, content: .text("I couldn't find a task matching '\(fragment)'.")))
+                }
             }
             
         case .proposePlan(let blocks):

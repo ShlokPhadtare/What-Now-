@@ -67,6 +67,35 @@ enum WNTheme {
     }
 }
 
+// MARK: - Centralized Semantic Colors (from Screenshot)
+
+enum WNColors {
+    static let background = Color.black
+    static let cardBackground = Color(hex: "1C1C1E")
+    static let cardBackgroundLighter = Color(hex: "242426")
+    static let primaryText = Color.white
+    static let secondaryText = Color(hex: "8E8E93")
+    static let tertiaryText = Color(hex: "636366")
+    static let accentBlue = Color(hex: "0A84FF")
+    static let successGreen = Color(hex: "30D158")
+    static let warningRed = Color(hex: "FF453A")
+    static let aiPurple = Color(hex: "BF5AF2")
+
+    // Pill & container backgrounds matching the reference screenshot
+    static let redBadgeBackground = Color(hex: "3A1414")
+    static let bluePillBackground = Color(hex: "102844")
+    static let grayPillBackground = Color(hex: "2C2C2E")
+    static let purpleSquareBackground = Color(hex: "2D1836")
+    static let greenButtonBackground = Color(hex: "182E1E")
+    static let activeTabPillBackground = Color(hex: "0D223A")
+}
+
+extension Color {
+    init(hex: String) {
+        self = WNTheme.color(hex: hex)
+    }
+}
+
 // MARK: - Category Color Extension
 
 extension WNCategory {
@@ -97,6 +126,23 @@ extension View {
         self
             .padding(WNTheme.Spacing.md)
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: WNTheme.Radius.md))
+    }
+
+    /// Apple-style schematic card with continuous rounded corners, secondary grouped background, and subtle hairline border.
+    func wnSchematicCard(
+        padding: CGFloat = WNTheme.Spacing.lg,
+        cornerRadius: CGFloat = WNTheme.Radius.lg
+    ) -> some View {
+        self
+            .padding(padding)
+            .background(
+                Color(uiColor: .secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
+            )
     }
 
     /// Section header style.

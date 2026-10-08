@@ -23,10 +23,10 @@ struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
     var text: String {
         switch content {
         case .text(let t): return t
-        case .actionResult(let title, _, _, _): return "Created task: \(title)"
-        case .planProposal: return "Proposed a plan."
-        case .planModification: return "Modified the plan."
-        case .memorySaved: return "Remembered a fact."
+        case .actionResult(let title, _, _, _): return "Added '\(title)'."
+        case .planProposal: return "Planned your day."
+        case .planModification: return "Updated the plan."
+        case .memorySaved: return "Got it."
         case .question(let prompt, _, _): return prompt
         }
     }

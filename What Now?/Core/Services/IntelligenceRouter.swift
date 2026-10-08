@@ -31,7 +31,7 @@ final class IntelligenceRouter: AIServiceProtocol {
     private let preferenceService: PreferenceService
     let openAIService: OpenAIAssistantService
     let lmStudioService: LMStudioAssistantService
-    private let localAssistantService: LocalAssistantService
+    let localAssistantService: LocalAssistantService
     
     /// Observable status of the currently selected external provider.
     private(set) var providerStatus: ProviderConnectionStatus = .unknown
