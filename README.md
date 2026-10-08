@@ -36,10 +36,11 @@ Start a task and enter a dedicated, calm focus environment. A contained circular
 ## 📱 Screenshots & Visuals
 
 <div align="center">
-  <img src="Screenshots/home.png" width="200" alt="Home Screen">
-  <img src="Screenshots/plan.png" width="200" alt="Planner">
-  <img src="Screenshots/assistant.png" width="200" alt="AI Assistant">
-  <img src="Screenshots/focus.png" width="200" alt="Focus Mode">
+  <img src="Screenshots/home.jpeg" width="200" alt="Home Screen">
+  <img src="Screenshots/plan.jpeg" width="200" alt="Planner">
+  <img src="Screenshots/tasks.jpeg" width="200" alt="Tasks">
+  <img src="Screenshots/assistant.jpeg" width="200" alt="AI Assistant">
+  <img src="Screenshots/settings.jpeg" width="200" alt="Settings">
 </div>
 ## 🛠 Tech Stack
 - **Platform**: iOS 17+
