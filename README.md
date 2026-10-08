@@ -34,8 +34,13 @@ On first launch, the assistant learns about you through a short, natural convers
 Start a task and enter a dedicated, calm focus environment. A contained circular progress ring tracks elapsed time. The background breathes gently while you work. You can leave at any time with the visible `< Back` button.
 
 ## 📱 Screenshots & Visuals
-*(Screenshots coming soon)*
 
+<div align="center">
+  <img src="Screenshots/home.png" width="200" alt="Home Screen">
+  <img src="Screenshots/plan.png" width="200" alt="Planner">
+  <img src="Screenshots/assistant.png" width="200" alt="AI Assistant">
+  <img src="Screenshots/focus.png" width="200" alt="Focus Mode">
+</div>
 ## 🛠 Tech Stack
 - **Platform**: iOS 17+
 - **Language**: Swift 6 (strict concurrency)
